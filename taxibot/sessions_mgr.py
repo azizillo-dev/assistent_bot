@@ -12,8 +12,28 @@ import config
 logger = logging.getLogger(__name__)
 
 
+def _fix_session_db(session_path: str):
+    db_file = session_path if session_path.endswith(".session") else session_path + ".session"
+    if os.path.exists(db_file):
+        try:
+            import sqlite3
+            with sqlite3.connect(db_file) as conn:
+                cols = [c[1] for c in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+                standard_cols = {"dc_id", "server_address", "port", "auth_key", "takeout_id"}
+                for col in cols:
+                    if col not in standard_cols:
+                        try:
+                            conn.execute(f"ALTER TABLE sessions DROP COLUMN {col}")
+                        except Exception:
+                            pass
+                conn.commit()
+        except Exception as e:
+            logger.warning("Session db fix xatosi (%s): %s", db_file, e)
+
+
 def _make_client(session_name: str) -> TelegramClient:
     path = os.path.join(config.SESSION_DIR, session_name)
+    _fix_session_db(path)
     return TelegramClient(
         path,
         config.API_ID,

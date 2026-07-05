@@ -304,7 +304,7 @@ def log_send(campaign_id: int, account_id: int, group_id: int, status: str, erro
 def get_statistics(user_id: int) -> dict:
     with get_conn() as conn:
         acc_total = conn.execute("SELECT COUNT(*) FROM accounts WHERE user_id=?", (user_id,)).fetchone()[0]
-        acc_active = conn.execute("SELECT COUNT(*) FROM accounts WHERE user_id=? AND is_active=1", (user_id,)).fetchone()[0]
+        acc_active = conn.execute("SELECT COUNT(*) FROM accounts WHERE user_id=? AND status='active'", (user_id,)).fetchone()[0]
         
         grp_total = conn.execute("SELECT COUNT(*) FROM groups WHERE user_id=?", (user_id,)).fetchone()[0]
         

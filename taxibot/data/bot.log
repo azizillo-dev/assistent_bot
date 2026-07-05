@@ -46,3 +46,271 @@
 2026-06-21 20:24:43,941 [INFO] aiogram.event: Update id=931005811 is handled. Duration 468 ms by bot id=8680988113
 2026-06-21 20:24:49,643 [INFO] aiogram.event: Update id=931005812 is handled. Duration 188 ms by bot id=8680988113
 2026-06-21 20:26:24,199 [INFO] scheduler: Kampaniya 'gggg' [1] — yuborildi: 0, xato: 1, timer: 0
+2026-07-05 13:55:33,156 [INFO] __main__: ✅ Database tayyor
+2026-07-05 13:55:36,715 [INFO] __main__: ✅ Bot: @assistant_taxist_bot
+2026-07-05 13:55:36,715 [INFO] aiogram.dispatcher: Start polling
+2026-07-05 13:55:36,715 [INFO] scheduler: Scheduler ishga tushdi
+2026-07-05 13:55:36,757 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-8' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 13:55:36,877 [INFO] aiogram.dispatcher: Run polling for bot @assistant_taxist_bot id=8248232713 - 'fkw'
+2026-07-05 13:55:52,455 [INFO] aiogram.event: Update id=190670453 is handled. Duration 468 ms by bot id=8248232713
+2026-07-05 13:56:27,244 [INFO] aiogram.event: Update id=190670454 is handled. Duration 906 ms by bot id=8248232713
+2026-07-05 13:56:30,219 [INFO] aiogram.event: Update id=190670455 is handled. Duration 203 ms by bot id=8248232713
+2026-07-05 13:56:34,452 [INFO] aiogram.dispatcher: Polling stopped
+2026-07-05 13:56:34,717 [INFO] aiogram.dispatcher: Polling stopped for bot @assistant_taxist_bot id=8248232713 - 'fkw'
+2026-07-05 13:56:34,718 [INFO] __main__: Bot to'xtatildi
+2026-07-05 13:56:38,958 [INFO] __main__: ✅ Database tayyor
+2026-07-05 13:56:39,850 [INFO] __main__: ✅ Bot: @assistant_taxist_bot
+2026-07-05 13:56:39,850 [INFO] aiogram.dispatcher: Start polling
+2026-07-05 13:56:39,851 [INFO] scheduler: Scheduler ishga tushdi
+2026-07-05 13:56:39,980 [INFO] aiogram.dispatcher: Run polling for bot @assistant_taxist_bot id=8248232713 - 'fkw'
+2026-07-05 13:56:50,339 [INFO] aiogram.event: Update id=190670456 is handled. Duration 593 ms by bot id=8248232713
+2026-07-05 13:57:48,065 [INFO] aiogram.event: Update id=190670457 is handled. Duration 484 ms by bot id=8248232713
+2026-07-05 13:57:59,947 [INFO] aiogram.event: Update id=190670458 is handled. Duration 172 ms by bot id=8248232713
+2026-07-05 13:58:03,569 [INFO] aiogram.event: Update id=190670459 is handled. Duration 531 ms by bot id=8248232713
+2026-07-05 13:58:06,852 [INFO] aiogram.event: Update id=190670460 is handled. Duration 171 ms by bot id=8248232713
+2026-07-05 13:58:08,966 [INFO] aiogram.event: Update id=190670461 is handled. Duration 328 ms by bot id=8248232713
+2026-07-05 13:58:12,070 [INFO] aiogram.event: Update id=190670462 is handled. Duration 375 ms by bot id=8248232713
+2026-07-05 13:58:19,883 [INFO] aiogram.event: Update id=190670463 is handled. Duration 328 ms by bot id=8248232713
+2026-07-05 13:58:24,049 [INFO] aiogram.event: Update id=190670464 is handled. Duration 359 ms by bot id=8248232713
+2026-07-05 13:58:36,200 [INFO] aiogram.event: Update id=190670465 is handled. Duration 468 ms by bot id=8248232713
+2026-07-05 13:58:39,705 [INFO] aiogram.event: Update id=190670466 is handled. Duration 171 ms by bot id=8248232713
+2026-07-05 13:58:39,925 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-56' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 13:58:43,786 [INFO] aiogram.event: Update id=190670467 is handled. Duration 187 ms by bot id=8248232713
+2026-07-05 13:58:46,386 [INFO] aiogram.event: Update id=190670468 is handled. Duration 171 ms by bot id=8248232713
+2026-07-05 13:58:49,465 [INFO] aiogram.event: Update id=190670469 is handled. Duration 155 ms by bot id=8248232713
+2026-07-05 13:58:54,920 [INFO] aiogram.event: Update id=190670470 is handled. Duration 187 ms by bot id=8248232713
+2026-07-05 13:59:01,471 [INFO] aiogram.event: Update id=190670471 is handled. Duration 515 ms by bot id=8248232713
+2026-07-05 13:59:31,033 [INFO] telethon.network.mtprotosender: Connecting to 149.154.167.51:443/TcpFull...
+2026-07-05 13:59:33,393 [WARNING] telethon.network.mtprotosender: Attempt 1 at new auth_key failed: Step 3 invalid new nonce hash
+2026-07-05 13:59:35,954 [INFO] telethon.network.mtprotosender: Connection to 149.154.167.51:443/TcpFull complete!
+2026-07-05 13:59:36,847 [INFO] aiogram.event: Update id=190670472 is handled. Duration 6578 ms by bot id=8248232713
+2026-07-05 13:59:44,568 [INFO] aiogram.event: Update id=190670473 is handled. Duration 500 ms by bot id=8248232713
+2026-07-05 13:59:54,831 [INFO] aiogram.event: Update id=190670474 is handled. Duration 1218 ms by bot id=8248232713
+2026-07-05 14:00:02,293 [INFO] aiogram.event: Update id=190670475 is handled. Duration 171 ms by bot id=8248232713
+2026-07-05 14:00:05,340 [INFO] aiogram.event: Update id=190670476 is handled. Duration 1171 ms by bot id=8248232713
+2026-07-05 14:00:18,460 [INFO] aiogram.event: Update id=190670477 is handled. Duration 405 ms by bot id=8248232713
+2026-07-05 14:00:20,762 [INFO] aiogram.event: Update id=190670478 is handled. Duration 312 ms by bot id=8248232713
+2026-07-05 14:00:25,497 [INFO] aiogram.event: Update id=190670479 is handled. Duration 500 ms by bot id=8248232713
+2026-07-05 14:00:28,303 [INFO] aiogram.event: Update id=190670480 is handled. Duration 171 ms by bot id=8248232713
+2026-07-05 14:00:29,498 [INFO] aiogram.event: Update id=190670481 is handled. Duration 235 ms by bot id=8248232713
+2026-07-05 14:00:31,545 [INFO] aiogram.event: Update id=190670482 is handled. Duration 312 ms by bot id=8248232713
+2026-07-05 14:00:35,339 [INFO] aiogram.event: Update id=190670483 is handled. Duration 187 ms by bot id=8248232713
+2026-07-05 14:00:39,325 [INFO] aiogram.event: Update id=190670484 is handled. Duration 171 ms by bot id=8248232713
+2026-07-05 14:00:41,068 [INFO] telethon.client.updates: Got difference for account updates
+2026-07-05 14:00:41,258 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:00:45,394 [INFO] aiogram.event: Update id=190670485 is handled. Duration 233 ms by bot id=8248232713
+2026-07-05 14:00:55,176 [INFO] aiogram.event: Update id=190670486 is handled. Duration 157 ms by bot id=8248232713
+2026-07-05 14:01:00,013 [INFO] aiogram.event: Update id=190670487 is handled. Duration 437 ms by bot id=8248232713
+2026-07-05 14:01:05,584 [INFO] aiogram.event: Update id=190670488 is handled. Duration 421 ms by bot id=8248232713
+2026-07-05 14:01:07,222 [INFO] aiogram.event: Update id=190670489 is handled. Duration 562 ms by bot id=8248232713
+2026-07-05 14:01:09,485 [INFO] aiogram.event: Update id=190670490 is handled. Duration 358 ms by bot id=8248232713
+2026-07-05 14:01:11,334 [INFO] aiogram.event: Update id=190670491 is handled. Duration 562 ms by bot id=8248232713
+2026-07-05 14:01:13,946 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:01:19,573 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:01:23,061 [INFO] telethon.client.updates: Got difference for account updates
+2026-07-05 14:01:23,236 [INFO] telethon.client.updates: Got difference for channel 1405915552 updates
+2026-07-05 14:01:23,468 [INFO] telethon.client.updates: Got difference for channel 1571503640 updates
+2026-07-05 14:01:26,037 [INFO] scheduler: Kampaniya 'boom' [2] — yuborildi: 1, xato: 0, timer: 0
+2026-07-05 14:01:40,031 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-211' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 14:02:11,373 [INFO] telethon.client.updates: Got difference for account updates
+2026-07-05 14:02:11,598 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:02:19,939 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:03:11,890 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:03:31,186 [INFO] telethon.client.updates: Got difference for account updates
+2026-07-05 14:03:31,875 [INFO] telethon.client.updates: Got difference for channel 1571503640 updates
+2026-07-05 14:03:42,500 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:03:49,598 [INFO] telethon.client.updates: Got difference for channel 3139301134 updates
+2026-07-05 14:04:07,095 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:04:11,876 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:04:20,584 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:04:26,525 [INFO] scheduler: Kampaniya 'boom' [2] — yuborildi: 1, xato: 0, timer: 0
+2026-07-05 14:04:40,175 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-343' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 14:07:25,885 [INFO] scheduler: Kampaniya 'boom' [2] — yuborildi: 1, xato: 0, timer: 0
+2026-07-05 14:07:40,265 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-376' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 14:10:35,222 [INFO] scheduler: Kampaniya 'boom' [2] — yuborildi: 1, xato: 0, timer: 0
+2026-07-05 14:10:40,331 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-408' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 14:10:59,061 [ERROR] aiogram.dispatcher: Failed to fetch updates - TelegramNetworkError: HTTP Client says - Request timeout error
+2026-07-05 14:10:59,062 [WARNING] aiogram.dispatcher: Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 8248232713)
+2026-07-05 14:11:10,473 [INFO] aiogram.dispatcher: Connection established (tryings = 1, bot id = 8248232713)
+2026-07-05 14:13:25,037 [INFO] scheduler: Kampaniya 'boom' [2] — yuborildi: 1, xato: 0, timer: 0
+2026-07-05 14:13:40,463 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-442' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 14:22:39,343 [ERROR] aiogram.dispatcher: Failed to fetch updates - TelegramNetworkError: HTTP Client says - Request timeout error
+2026-07-05 14:22:39,344 [WARNING] aiogram.dispatcher: Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 8248232713)
+2026-07-05 14:22:39,421 [ERROR] asyncio: Task exception was never retrieved
+future: <Task finished name='Task-463' coro=<CampaignScheduler._run_campaign() done, defined at D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py:54> exception=ValueError('too many values to unpack (expected 5)')>
+Traceback (most recent call last):
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\scheduler.py", line 100, in _run_campaign
+    await send_message(session_name, identifier, text, font_style)
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sender.py", line 110, in send_message
+    client = await session_manager.get_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 36, in get_client
+    client = _make_client(session_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Downloads\Telegram Desktop\assistant_oftaxi\taxibot\sessions_mgr.py", line 17, in _make_client
+    return TelegramClient(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\client\telegrambaseclient.py", line 290, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\AppData\Local\Programs\Python\Python312\Lib\site-packages\telethon\sessions\sqlite.py", line 64, in __init__
+    self._dc_id, self._server_address, self._port, key, \
+ValueError: too many values to unpack (expected 5)
+2026-07-05 14:22:50,787 [INFO] aiogram.dispatcher: Connection established (tryings = 1, bot id = 8248232713)
+2026-07-05 14:22:58,697 [WARNING] telethon.network.connection.connection: Server closed the connection: [WinError 121] The semaphore timeout period has expired
+2026-07-05 14:22:58,713 [INFO] telethon.network.mtprotosender: Connection closed while receiving data: [WinError 121] The semaphore timeout period has expired
+2026-07-05 14:22:58,715 [INFO] telethon.network.mtprotosender: Closing current connection to begin reconnect...
+2026-07-05 14:22:58,717 [INFO] telethon.network.connection.connection: <class 'OSError'> during disconnect: [WinError 121] The semaphore timeout period has expired
+2026-07-05 14:22:58,718 [INFO] telethon.network.mtprotosender: Connecting to 149.154.167.51:443/TcpFull...
+2026-07-05 14:22:58,742 [INFO] telethon.network.mtprotosender: Connection to 149.154.167.51:443/TcpFull complete!
+2026-07-05 14:22:59,132 [INFO] telethon.client.updates: Got difference for account updates
+2026-07-05 14:22:59,365 [INFO] telethon.client.updates: Got difference for channel 3139301134 updates
+2026-07-05 14:22:59,563 [INFO] telethon.client.updates: Got difference for channel 1571503640 updates
+2026-07-05 14:23:00,145 [INFO] telethon.client.updates: Got difference for channel 1405915552 updates
+2026-07-05 14:23:01,662 [INFO] scheduler: Kampaniya 'boom' [2] — yuborildi: 1, xato: 0, timer: 0
+2026-07-05 14:23:51,876 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:23:56,816 [INFO] telethon.client.updates: Got difference for channel 1535493404 updates
+2026-07-05 14:25:39,477 [INFO] telethon.network.mtprotosender: Connecting to 149.154.167.51:443/TcpFull...
+2026-07-05 14:25:39,661 [INFO] telethon.network.mtprotosender: Connection to 149.154.167.51:443/TcpFull complete!
+2026-07-05 14:25:40,414 [INFO] scheduler: Kampaniya 'gggg' [1] — yuborildi: 0, xato: 1, timer: 0
+2026-07-05 14:25:43,392 [INFO] scheduler: Kampaniya 'boom' [2] — yuborildi: 1, xato: 0, timer: 0
+2026-07-05 14:28:07,436 [INFO] aiogram.dispatcher: Polling stopped
+2026-07-05 14:28:07,436 [INFO] telethon.network.mtprotosender: Disconnecting from 149.154.167.51:443/TcpFull...
+2026-07-05 14:28:07,451 [INFO] telethon.network.mtprotosender: Disconnection from 149.154.167.51:443/TcpFull complete!
+2026-07-05 14:28:07,451 [INFO] telethon.network.mtprotosender: Disconnecting from 149.154.167.51:443/TcpFull...
+2026-07-05 14:28:07,451 [INFO] telethon.network.mtprotosender: Disconnection from 149.154.167.51:443/TcpFull complete!
+2026-07-05 14:28:07,732 [INFO] aiogram.dispatcher: Polling stopped for bot @assistant_taxist_bot id=8248232713 - 'fkw'
+2026-07-05 14:28:07,732 [INFO] __main__: Bot to'xtatildi
