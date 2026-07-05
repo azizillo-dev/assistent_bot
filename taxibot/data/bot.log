@@ -1,0 +1,48 @@
+2026-06-05 11:11:50,460 [INFO] __main__: ✅ Database tayyor
+2026-06-05 11:11:54,464 [INFO] __main__: ✅ Bot: @azizbektaxibot
+2026-06-05 11:11:54,465 [INFO] aiogram.dispatcher: Start polling
+2026-06-05 11:11:54,465 [INFO] scheduler: Scheduler ishga tushdi
+2026-06-05 11:11:54,850 [INFO] aiogram.dispatcher: Run polling for bot @azizbektaxibot id=8680988113 - 'taxiii'
+2026-06-05 11:12:16,112 [INFO] aiogram.event: Update id=931005679 is handled. Duration 595 ms by bot id=8680988113
+2026-06-05 11:12:18,174 [INFO] aiogram.event: Update id=931005680 is handled. Duration 204 ms by bot id=8680988113
+2026-06-05 11:12:21,456 [INFO] aiogram.event: Update id=931005681 is handled. Duration 1741 ms by bot id=8680988113
+2026-06-05 11:12:22,216 [INFO] aiogram.event: Update id=931005682 is handled. Duration 286 ms by bot id=8680988113
+2026-06-05 11:12:27,837 [INFO] aiogram.event: Update id=931005683 is handled. Duration 288 ms by bot id=8680988113
+2026-06-05 11:12:31,354 [INFO] aiogram.event: Update id=931005684 is handled. Duration 2034 ms by bot id=8680988113
+2026-06-05 11:12:38,407 [INFO] aiogram.event: Update id=931005685 is handled. Duration 231 ms by bot id=8680988113
+2026-06-05 11:12:40,290 [INFO] aiogram.event: Update id=931005686 is handled. Duration 503 ms by bot id=8680988113
+2026-06-05 11:12:53,718 [INFO] telethon.network.mtprotosender: Connecting to 149.154.167.51:443/TcpFull...
+2026-06-05 11:12:56,510 [INFO] telethon.network.mtprotosender: Connection to 149.154.167.51:443/TcpFull complete!
+2026-06-05 11:13:03,621 [INFO] aiogram.event: Update id=931005687 is handled. Duration 10983 ms by bot id=8680988113
+2026-06-05 11:13:33,342 [INFO] aiogram.event: Update id=931005688 is handled. Duration 540 ms by bot id=8680988113
+2026-06-05 11:13:42,778 [INFO] aiogram.event: Update id=931005689 is handled. Duration 2030 ms by bot id=8680988113
+2026-06-05 11:13:45,463 [INFO] aiogram.event: Update id=931005690 is handled. Duration 394 ms by bot id=8680988113
+2026-06-05 11:13:47,058 [INFO] aiogram.event: Update id=931005691 is handled. Duration 584 ms by bot id=8680988113
+2026-06-05 11:13:49,884 [INFO] aiogram.event: Update id=931005692 is handled. Duration 216 ms by bot id=8680988113
+2026-06-05 11:14:04,361 [INFO] aiogram.event: Update id=931005693 is handled. Duration 751 ms by bot id=8680988113
+2026-06-05 11:14:17,028 [INFO] aiogram.event: Update id=931005694 is handled. Duration 574 ms by bot id=8680988113
+2026-06-05 11:14:21,042 [INFO] aiogram.event: Update id=931005695 is handled. Duration 232 ms by bot id=8680988113
+2026-06-05 11:14:22,304 [INFO] aiogram.event: Update id=931005696 is handled. Duration 234 ms by bot id=8680988113
+2026-06-05 11:14:23,817 [INFO] aiogram.event: Update id=931005697 is handled. Duration 418 ms by bot id=8680988113
+2026-06-05 11:14:47,496 [INFO] aiogram.event: Update id=931005698 is handled. Duration 457 ms by bot id=8680988113
+2026-06-05 11:15:10,768 [INFO] aiogram.event: Update id=931005699 is handled. Duration 298 ms by bot id=8680988113
+2026-06-05 11:15:16,399 [INFO] aiogram.event: Update id=931005700 is handled. Duration 200 ms by bot id=8680988113
+2026-06-05 11:15:30,693 [INFO] aiogram.event: Update id=931005701 is handled. Duration 379 ms by bot id=8680988113
+2026-06-05 11:15:43,596 [INFO] aiogram.event: Update id=931005702 is handled. Duration 650 ms by bot id=8680988113
+2026-06-05 11:15:46,361 [INFO] aiogram.event: Update id=931005703 is handled. Duration 614 ms by bot id=8680988113
+2026-06-05 11:15:48,640 [INFO] aiogram.event: Update id=931005704 is handled. Duration 457 ms by bot id=8680988113
+2026-06-05 11:15:50,842 [INFO] aiogram.event: Update id=931005705 is handled. Duration 773 ms by bot id=8680988113
+2026-06-05 11:15:52,068 [INFO] aiogram.event: Update id=931005706 is handled. Duration 373 ms by bot id=8680988113
+2026-06-05 11:15:53,176 [INFO] aiogram.event: Update id=931005707 is handled. Duration 441 ms by bot id=8680988113
+2026-06-05 11:16:00,570 [INFO] scheduler: Kampaniya 'gggg' [1] — yuborildi: 1, xato: 0, timer: 0
+2026-06-21 20:23:23,030 [INFO] __main__: ✅ Database tayyor
+2026-06-21 20:23:23,990 [INFO] __main__: ✅ Bot: @azizbektaxibot
+2026-06-21 20:23:23,991 [INFO] aiogram.dispatcher: Start polling
+2026-06-21 20:23:23,991 [INFO] scheduler: Scheduler ishga tushdi
+2026-06-21 20:23:24,033 [INFO] telethon.network.mtprotosender: Connecting to 149.154.167.51:443/TcpFull...
+2026-06-21 20:23:24,142 [INFO] aiogram.dispatcher: Run polling for bot @azizbektaxibot id=8680988113 - 'taxiii'
+2026-06-21 20:23:24,158 [INFO] telethon.network.mtprotosender: Connection to 149.154.167.51:443/TcpFull complete!
+2026-06-21 20:23:24,746 [INFO] scheduler: Kampaniya 'gggg' [1] — yuborildi: 0, xato: 1, timer: 0
+2026-06-21 20:24:43,941 [INFO] aiogram.event: Update id=931005811 is handled. Duration 468 ms by bot id=8680988113
+2026-06-21 20:24:49,643 [INFO] aiogram.event: Update id=931005812 is handled. Duration 188 ms by bot id=8680988113
+2026-06-21 20:26:24,199 [INFO] scheduler: Kampaniya 'gggg' [1] — yuborildi: 0, xato: 1, timer: 0
