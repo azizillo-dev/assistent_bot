@@ -16,3 +16,4 @@ ALLOWED_USERS: list[int] = [
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SESSION_DIR = os.getenv("SESSION_DIR", os.path.join(BASE_DIR, "sessions"))
 MAX_ACCOUNTS_PER_USER = 20
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Senior0307")

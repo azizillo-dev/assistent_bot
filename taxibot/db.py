@@ -82,6 +82,16 @@ def init_db():
             error       TEXT,
             sent_at     TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS allowed_users (
+            user_id  INTEGER PRIMARY KEY,
+            added_at TEXT    DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT
+        );
         """)
 
     # Eski DB uchun yangi ustunlarni qo'shish (migration)
@@ -94,6 +104,19 @@ def init_db():
             conn.execute("ALTER TABLE campaigns ADD COLUMN font_style TEXT NOT NULL DEFAULT 'none'")
         except Exception:
             pass
+
+        # Boshlang'ich ruxsat etilgan foydalanuvchilar va sozlamalar migratsiyasi
+        try:
+            import config
+            cur = conn.execute("SELECT COUNT(*) as cnt FROM allowed_users")
+            if cur.fetchone()["cnt"] == 0:
+                for uid in getattr(config, "ALLOWED_USERS", []):
+                    conn.execute("INSERT OR IGNORE INTO allowed_users (user_id) VALUES (?)", (uid,))
+            
+            conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", ("max_accounts", str(getattr(config, "MAX_ACCOUNTS_PER_USER", 20))))
+            conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", ("admin_password", getattr(config, "ADMIN_PASSWORD", "Senior0307")))
+        except Exception as e:
+            print(f"Migration error: {e}")
 
 
 # ── Accounts ──────────────────────────────────────────────────────────────────
@@ -276,3 +299,44 @@ def log_send(campaign_id: int, account_id: int, group_id: int, status: str, erro
             "INSERT INTO send_log(campaign_id,account_id,group_id,status,error) VALUES(?,?,?,?,?)",
             (campaign_id, account_id, group_id, status, error),
         )
+
+
+# ── Allowed Users & Settings (Secret Admin Panel) ─────────────────────────────
+
+def is_user_allowed(user_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute("SELECT 1 FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        return row is not None
+
+
+def add_allowed_user(user_id: int) -> bool:
+    try:
+        with get_conn() as conn:
+            conn.execute("INSERT OR IGNORE INTO allowed_users (user_id) VALUES (?)", (user_id,))
+        return True
+    except Exception:
+        return False
+
+
+def remove_allowed_user(user_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM allowed_users WHERE user_id=?", (user_id,))
+        return cur.rowcount > 0
+
+
+def get_all_allowed_users() -> list[int]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT user_id FROM allowed_users ORDER BY added_at ASC").fetchall()
+        return [r["user_id"] for r in rows]
+
+
+def get_setting(key: str, default: str = "") -> str:
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else default
+
+
+def set_setting(key: str, value: str):
+    with get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
+

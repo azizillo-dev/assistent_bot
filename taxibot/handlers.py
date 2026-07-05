@@ -8,6 +8,7 @@ Yangiliklar:
 import asyncio
 import logging
 import re
+import html as html_lib
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command, CommandStart
@@ -25,14 +26,54 @@ router = Router()
 # ── Ruxsat filtri ─────────────────────────────────────────────────────────────
 
 def allowed(user_id: int) -> bool:
-    return user_id in config.ALLOWED_USERS
+    return db.is_user_allowed(user_id)
 
 
 def access_denied():
     return "⛔ Sizga ruxsat yo'q."
 
 
+SUPER_ADMINS: set[int] = set()
+
+
+def check_admin(user_id: int) -> bool:
+    return user_id in SUPER_ADMINS or allowed(user_id)
+
+
+def get_max_accounts() -> int:
+    try:
+        return int(db.get_setting("max_accounts", str(getattr(config, "MAX_ACCOUNTS_PER_USER", 20))))
+    except ValueError:
+        return 20
+
+
+def get_message_html(msg: Message) -> str:
+    """
+    Xabarning HTML matnini olib beradi (Premium emojilar va formatlashlar saqlanadi).
+    Qo'lda yozilgan HTML teglari (<, >, &) bo'lsa, ularni ham to'g'ri ko'rsatadi.
+    """
+    text = msg.html_text or msg.text or msg.caption or ""
+    text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    return text
+
+
+def preview_text(text: str, max_len: int = 200) -> str:
+    """HTML teglardan tozalangan xavfsiz qisqa ko'rinish (preview) tayyorlaydi."""
+    clean = re.sub(r'<[^>]+>', '', text)
+    clean = html_lib.unescape(clean)
+    if len(clean) > max_len:
+        clean = clean[:max_len] + "..."
+    return html_lib.escape(clean)
+
+
 # ── FSM States ────────────────────────────────────────────────────────────────
+
+class AdminStates(StatesGroup):
+    waiting_password = State()
+    waiting_add_id   = State()
+    waiting_del_id   = State()
+    waiting_limit    = State()
+    waiting_new_pass = State()
 
 class LoginStates(StatesGroup):
     waiting_phone = State()
@@ -114,7 +155,7 @@ async def menu_accounts(msg: Message):
     accs = db.get_accounts(uid)
     count = len(accs)
 
-    text = f"<b>📱 Akkauntlar</b> ({count}/{config.MAX_ACCOUNTS_PER_USER})\n\n"
+    text = f"<b>📱 Akkauntlar</b> ({count}/{get_max_accounts()})\n\n"
     if accs:
         for a in accs:
             text += f"• {a['name'] or a['phone']} — <code>{a['phone']}</code>\n"
@@ -122,7 +163,7 @@ async def menu_accounts(msg: Message):
         text += "Hali akkaunt ulanmagan.\n"
 
     buttons = []
-    if count < config.MAX_ACCOUNTS_PER_USER:
+    if count < get_max_accounts():
         buttons.append(("➕ Akkaunt ulash", "acc_add"))
     if accs:
         buttons.append(("🗑 Akkaunt o'chirish", "acc_del_list"))
@@ -148,8 +189,8 @@ async def login_phone(msg: Message, state: FSMContext):
         return
 
     uid = msg.from_user.id
-    if db.count_accounts(uid) >= config.MAX_ACCOUNTS_PER_USER:
-        await msg.answer(f"❌ Maksimal {config.MAX_ACCOUNTS_PER_USER} ta akkaunt.")
+    if db.count_accounts(uid) >= get_max_accounts():
+        await msg.answer(f"❌ Maksimal {get_max_accounts()} ta akkaunt.")
         await state.clear()
         return
 
@@ -268,7 +309,7 @@ async def menu_groups(msg: Message):
     else:
         text += "Hali guruh qo'shilmagan.\n"
 
-    buttons = [("➕ Guruh qo'shish", "grp_add")]
+    buttons = [("➕ Guruh qo'shish", "grp_add"), ("🔍 Akkaunt guruhlarini import qilish", "grp_import_start")]
     if groups:
         buttons.append(("🗑 Guruh o'chirish", "grp_del_list"))
     await msg.answer(text, reply_markup=ik(*buttons))
@@ -371,6 +412,221 @@ async def grp_back(cq: CallbackQuery):
     await cq.answer()
 
 
+@router.callback_query(F.data == "ignore")
+async def ignore_cb(cq: CallbackQuery):
+    await cq.answer()
+
+
+@router.callback_query(F.data == "grp_import_start")
+async def grp_import_start(cq: CallbackQuery, state: FSMContext):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    accs = db.get_accounts(cq.from_user.id)
+    if not accs:
+        return await cq.answer("❌ Hali akkaunt ulanmagan. Avval akkaunt ulang!", show_alert=True)
+    
+    if len(accs) == 1:
+        await fetch_and_show_import(cq.message, cq.from_user.id, accs[0]["session_name"], state, is_edit=True)
+    else:
+        buttons = [(f"📱 {a['name'] or a['phone']}", f"grp_imp_acc_{a['session_name']}") for a in accs]
+        buttons.append(("❌ Bekor qilish", "grp_cancel"))
+        await cq.message.edit_text("🔍 Qaysi akkaunt guruhlarini import qilmoqchisiz?", reply_markup=ik(*buttons))
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("grp_imp_acc_"))
+async def grp_import_acc_selected(cq: CallbackQuery, state: FSMContext):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    session_name = cq.data[len("grp_imp_acc_"):]
+    await fetch_and_show_import(cq.message, cq.from_user.id, session_name, state, is_edit=True)
+    await cq.answer()
+
+
+async def fetch_and_show_import(msg: Message, user_id: int, session_name: str, state: FSMContext, is_edit: bool = False):
+    wait_text = "⏳ Guruhlar ro'yxati yuklanmoqda... Iltimos, biroz kutib turing."
+    if is_edit:
+        try:
+            await msg.edit_text(wait_text)
+        except Exception:
+            msg = await msg.answer(wait_text)
+            is_edit = False
+    else:
+        msg = await msg.answer(wait_text)
+        
+    try:
+        client = await session_manager.get_client(session_name)
+        if not await client.is_user_authorized():
+            await msg.edit_text("❌ Akkaunt avtorizatsiyadan o'tmagan. Qaytadan ulanib ko'ring.")
+            return
+        
+        dialogs = await client.get_dialogs()
+        groups_list = []
+        for d in dialogs:
+            # Foydalanuvchi talabi: Kanallar KK EMAS, faqat guruhlar!
+            if getattr(d, "is_group", False):
+                title = getattr(d, "title", "") or "Guruh"
+                if getattr(d.entity, "username", None):
+                    ident = f"@{d.entity.username}"
+                else:
+                    ident = str(d.id)
+                groups_list.append({"id": ident, "title": title})
+                
+        if not groups_list:
+            await msg.edit_text("⚠️ Ushbu akkauntda hech qanday guruh topilmadi.")
+            return
+            
+        await state.update_data(import_groups=groups_list, selected_import=[], import_page=0)
+        await render_import_page(msg, state, page=0, is_edit=True)
+    except Exception as e:
+        logger.error(f"Import error: {e}")
+        await msg.edit_text(f"❌ Guruhlarni yuklashda xatolik yuz berdi:\n<code>{e}</code>")
+
+
+async def render_import_page(msg: Message, state: FSMContext, page: int = 0, is_edit: bool = True):
+    data = await state.get_data()
+    groups_list = data.get("import_groups", [])
+    selected = data.get("selected_import", [])
+    
+    per_page = 10
+    total_pages = (len(groups_list) + per_page - 1) // per_page
+    if page < 0:
+        page = 0
+    elif page >= total_pages and total_pages > 0:
+        page = total_pages - 1
+        
+    await state.update_data(import_page=page)
+    
+    start_idx = page * per_page
+    end_idx = min(start_idx + per_page, len(groups_list))
+    page_groups = groups_list[start_idx:end_idx]
+    
+    kb_rows = []
+    # 1. Guruhlar (har biri alohida qatorda)
+    for i, g in enumerate(page_groups, start=start_idx):
+        is_sel = g["id"] in selected
+        mark = "☑️" if is_sel else "⬜️"
+        kb_rows.append([InlineKeyboardButton(text=f"{mark} {g['title'][:30]}", callback_data=f"grp_tgl_{i}")])
+        
+    # 2. Sahifani o'tkazish (bitta qatorda)
+    if total_pages > 1:
+        nav_row = []
+        if page > 0:
+            nav_row.append(InlineKeyboardButton(text="◀️", callback_data=f"grp_imp_page_{page-1}"))
+        nav_row.append(InlineKeyboardButton(text=f"📄 {page+1}/{total_pages}", callback_data="ignore"))
+        if page < total_pages - 1:
+            nav_row.append(InlineKeyboardButton(text="▶️", callback_data=f"grp_imp_page_{page+1}"))
+        kb_rows.append(nav_row)
+        
+    # 3. Foydalanuvchi talabi: Barchasini tanlash / bekor qilish (ro'yxat pastida)
+    all_selected = len(selected) == len(groups_list) and len(groups_list) > 0
+    if all_selected:
+        kb_rows.append([InlineKeyboardButton(text="⬜️ Barchasini bekor qilish", callback_data="grp_tgl_all_off")])
+    else:
+        kb_rows.append([InlineKeyboardButton(text="☑️ Barchasini tanlash", callback_data="grp_tgl_all_on")])
+        
+    # 4. Saqlash va Bekor qilish
+    kb_rows.append([
+        InlineKeyboardButton(text=f"✅ Saqlash ({len(selected)})", callback_data="grp_imp_save"),
+        InlineKeyboardButton(text="❌ Bekor qilish", callback_data="grp_cancel")
+    ])
+    
+    text = (
+        f"<b>🔍 Guruhlarni tanlang</b>\n\n"
+        f"Jami guruhlar: <b>{len(groups_list)} ta</b>\n"
+        f"Tanlandi: <b>{len(selected)} ta</b>\n\n"
+        "Kerakli guruhlarni belgiling va <b>✅ Saqlash</b> tugmasini bosing:"
+    )
+    
+    markup = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+    if is_edit:
+        try:
+            await msg.edit_text(text, reply_markup=markup)
+        except Exception:
+            await msg.answer(text, reply_markup=markup)
+    else:
+        await msg.answer(text, reply_markup=markup)
+
+
+@router.callback_query(F.data == "grp_tgl_all_on")
+async def grp_tgl_all_on(cq: CallbackQuery, state: FSMContext):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    data = await state.get_data()
+    groups_list = data.get("import_groups", [])
+    all_ids = [g["id"] for g in groups_list]
+    await state.update_data(selected_import=all_ids)
+    await render_import_page(cq.message, state, page=data.get("import_page", 0), is_edit=True)
+    await cq.answer("Barcha guruhlar tanlandi!")
+
+
+@router.callback_query(F.data == "grp_tgl_all_off")
+async def grp_tgl_all_off(cq: CallbackQuery, state: FSMContext):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    data = await state.get_data()
+    await state.update_data(selected_import=[])
+    await render_import_page(cq.message, state, page=data.get("import_page", 0), is_edit=True)
+    await cq.answer("Tanlash bekor qilindi!")
+
+
+@router.callback_query(F.data.startswith("grp_tgl_"))
+async def grp_toggle_item(cq: CallbackQuery, state: FSMContext):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    idx_str = cq.data[len("grp_tgl_"):]
+    if not idx_str.isdigit():
+        return await cq.answer()
+    idx = int(idx_str)
+    
+    data = await state.get_data()
+    groups_list = data.get("import_groups", [])
+    selected = list(data.get("selected_import", []))
+    
+    if 0 <= idx < len(groups_list):
+        g_id = groups_list[idx]["id"]
+        if g_id in selected:
+            selected.remove(g_id)
+        else:
+            selected.append(g_id)
+        await state.update_data(selected_import=selected)
+        await render_import_page(cq.message, state, page=data.get("import_page", 0), is_edit=True)
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("grp_imp_page_"))
+async def grp_import_page_change(cq: CallbackQuery, state: FSMContext):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    page_str = cq.data[len("grp_imp_page_"):]
+    if page_str.isdigit():
+        await render_import_page(cq.message, state, page=int(page_str), is_edit=True)
+    await cq.answer()
+
+
+@router.callback_query(F.data == "grp_imp_save")
+async def grp_import_save(cq: CallbackQuery, state: FSMContext):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    data = await state.get_data()
+    selected = data.get("selected_import", [])
+    groups_list = data.get("import_groups", [])
+    
+    if not selected:
+        return await cq.answer("⚠️ Hech qanday guruh tanlanmagan!", show_alert=True)
+        
+    uid = cq.from_user.id
+    count = 0
+    for g in groups_list:
+        if g["id"] in selected:
+            db.add_group(uid, g["id"], g["title"])
+            count += 1
+            
+    await state.clear()
+    await cq.message.edit_text(f"✅ Muvaffaqiyatli! <b>{count} ta</b> guruh bazaga qo'shildi.")
+    await cq.answer()
+
+
 # ── KAMPANIYALAR ──────────────────────────────────────────────────────────────
 
 @router.message(F.text == "📢 Kampaniyalar")
@@ -429,7 +685,7 @@ async def camp_name(msg: Message, state: FSMContext):
 async def camp_text(msg: Message, state: FSMContext):
     if not allowed(msg.from_user.id):
         return
-    await state.update_data(text=msg.text)
+    await state.update_data(text=get_message_html(msg))
     await msg.answer(
         "⏱ Har necha minutda yuborsin?\n\n"
         "Masalan: <code>3</code>, <code>5</code>, <code>10</code>, <code>30</code>"
@@ -655,7 +911,7 @@ async def camp_detail(cq: CallbackQuery):
         f"Guruhlar: {len(grps)} ta\n"
         f"Oxirgi: {last_run_str}\n"
         f"Keyingi: {next_run_str}\n\n"
-        f"<b>Matn:</b>\n{c['message_text'][:200]}{'...' if len(c['message_text']) > 200 else ''}"
+        f"<b>Matn:</b>\n{preview_text(c['message_text'], 200)}"
     )
 
     toggle_label = "⏸ To'xtatish" if c["is_active"] else "▶️ Ishga tushirish"
@@ -707,7 +963,7 @@ async def camp_edit_text_save(msg: Message, state: FSMContext):
         return
     data = await state.get_data()
     cid = data["edit_camp_id"]
-    db.update_campaign_field(cid, "message_text", msg.text)
+    db.update_campaign_field(cid, "message_text", get_message_html(msg))
     await msg.answer("✅ Matn yangilandi!", reply_markup=main_kb())
     await state.clear()
 
@@ -872,7 +1128,7 @@ async def camp_bulk_edit_start(cq: CallbackQuery, state: FSMContext):
 async def camp_bulk_text_save(msg: Message, state: FSMContext):
     if not allowed(msg.from_user.id):
         return
-    new_text = msg.text
+    new_text = get_message_html(msg)
     uid = msg.from_user.id
     camps = db.get_campaigns(uid)
     count = len(camps)
@@ -880,7 +1136,7 @@ async def camp_bulk_text_save(msg: Message, state: FSMContext):
     db.update_all_campaigns_text(uid, new_text)
     await msg.answer(
         f"✅ <b>{count} ta kampaniyaning</b> matni yangilandi!\n\n"
-        f"Yangi matn:\n<i>{new_text[:300]}{'...' if len(new_text) > 300 else ''}</i>",
+        f"Yangi matn:\n<i>{preview_text(new_text, 300)}</i>",
         reply_markup=main_kb()
     )
     await state.clear()
@@ -929,3 +1185,187 @@ async def menu_status(msg: Message):
                 lines.append(f"  ⏰ Keyingi: {c['next_run'][:16]}")
 
     await msg.answer("\n".join(lines))
+
+
+# ── YASHIRIN ADMIN PANEL (/root) ──────────────────────────────────────────────
+
+@router.message(Command("root"))
+async def cmd_root(msg: Message, state: FSMContext):
+    await msg.answer("🔐 Maxsus boshqaruv tizimi. Parolni kiriting:")
+    await state.set_state(AdminStates.waiting_password)
+
+
+@router.message(AdminStates.waiting_password)
+async def admin_verify_pass(msg: Message, state: FSMContext):
+    entered_pass = msg.text.strip()
+    real_pass = db.get_setting("admin_password", getattr(config, "ADMIN_PASSWORD", "Senior0307"))
+    
+    if entered_pass == real_pass:
+        SUPER_ADMINS.add(msg.from_user.id)
+        await state.clear()
+        await show_admin_panel(msg)
+    else:
+        await state.clear()
+        await msg.answer("⛔ Sizga ruxsat yo'q.")
+
+
+async def show_admin_panel(event: Message | CallbackQuery):
+    users = db.get_all_allowed_users()
+    limit = get_max_accounts()
+    
+    text = (
+        "<b>🔐 Maxfiy Admin Panel</b>\n\n"
+        f"👥 Ruxsat etilgan foydalanuvchilar: <b>{len(users)} ta</b>\n"
+        f"📱 Akkauntlar limiti: <b>har bir userga {limit} ta</b>\n\n"
+        "Quyidagi menyudan kerakli amallarni bajaring:"
+    )
+    
+    kb = ik(
+        ("👥 Ruxsatlilar ro'yxati", "admin_list_users"),
+        ("➕ Foydalanuvchi qo'shish", "admin_add_user"),
+        ("🗑 Foydalanuvchi o'chirish", "admin_del_user"),
+        ("⚙️ Limitni o'zgartirish", "admin_edit_limit"),
+        ("🔑 Parolni o'zgartirish", "admin_edit_pass"),
+        ("🔒 Panelni yopish", "admin_close")
+    )
+    
+    if isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, reply_markup=kb)
+    else:
+        await event.answer(text, reply_markup=kb)
+
+
+@router.callback_query(F.data == "admin_list_users")
+async def admin_list_users_handler(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    users = db.get_all_allowed_users()
+    text = "<b>👥 Ruxsat etilgan foydalanuvchilar ro'yxati:</b>\n\n"
+    for i, uid in enumerate(users, 1):
+        text += f"{i}. <code>{uid}</code>\n"
+    await cq.message.edit_text(text, reply_markup=ik(("◀️ Orqaga", "admin_back")))
+    await cq.answer()
+
+
+@router.callback_query(F.data == "admin_add_user")
+async def admin_add_user_start(cq: CallbackQuery, state: FSMContext):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    await cq.message.answer("➕ Yangi foydalanuvchining Telegram ID raqamini kiriting (yoki xabarini shu yerga forward qiling):")
+    await state.set_state(AdminStates.waiting_add_id)
+    await cq.answer()
+
+
+@router.message(AdminStates.waiting_add_id)
+async def admin_save_new_user(msg: Message, state: FSMContext):
+    if not check_admin(msg.from_user.id):
+        return
+    if msg.forward_from:
+        new_id = msg.forward_from.id
+    elif msg.forward_from_chat:
+        new_id = msg.forward_from_chat.id
+    else:
+        text = msg.text.strip()
+        if not text.isdigit():
+            await msg.answer("❌ Noto'g'ri ID format. Faqat raqamlardan iborat Telegram ID kiriting:")
+            return
+        new_id = int(text)
+    
+    if db.add_allowed_user(new_id):
+        await msg.answer(f"✅ Foydalanuvchi <code>{new_id}</code> ruxsat etilganlar ro'yxatiga qo'shildi!")
+    else:
+        await msg.answer(f"⚠️ Ushbu ID <code>{new_id}</code> allaqachon ro'yxatda bor.")
+    await state.clear()
+    await show_admin_panel(msg)
+
+
+@router.callback_query(F.data == "admin_del_user")
+async def admin_del_user_start(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    users = db.get_all_allowed_users()
+    if not users:
+        return await cq.answer("Ro'yxat bo'sh", show_alert=True)
+    
+    buttons = []
+    for uid in users:
+        buttons.append((f"❌ {uid}", f"admin_del_confirm_{uid}"))
+    buttons.append(("◀️ Orqaga", "admin_back"))
+    
+    await cq.message.edit_text("🗑 O'chirmoqchi bo'lgan foydalanuvchi ID sini tanlang:", reply_markup=ik(*buttons))
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("admin_del_confirm_"))
+async def admin_del_user_exec(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    target_id = int(cq.data.split("_")[-1])
+    if db.remove_allowed_user(target_id):
+        await cq.answer("✅ Foydalanuvchi o'chirildi!", show_alert=True)
+    else:
+        await cq.answer("⚠️ Topilmadi", show_alert=True)
+    await show_admin_panel(cq)
+
+
+@router.callback_query(F.data == "admin_edit_limit")
+async def admin_edit_limit_start(cq: CallbackQuery, state: FSMContext):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    current = get_max_accounts()
+    await cq.message.answer(f"⚙️ Hozirgi akkauntlar limiti: <b>{current} ta</b>.\n\nYangi limit sonini kiriting (masalan: 5, 10, 50):")
+    await state.set_state(AdminStates.waiting_limit)
+    await cq.answer()
+
+
+@router.message(AdminStates.waiting_limit)
+async def admin_save_limit(msg: Message, state: FSMContext):
+    if not check_admin(msg.from_user.id):
+        return
+    text = msg.text.strip()
+    if not text.isdigit() or int(text) < 1:
+        await msg.answer("❌ Musbat son kiriting (masalan: 20):")
+        return
+    new_limit = int(text)
+    db.set_setting("max_accounts", str(new_limit))
+    await msg.answer(f"✅ Akkauntlar limiti <b>{new_limit} ta</b> qilib o'rnatildi!")
+    await state.clear()
+    await show_admin_panel(msg)
+
+
+@router.callback_query(F.data == "admin_edit_pass")
+async def admin_edit_pass_start(cq: CallbackQuery, state: FSMContext):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    await cq.message.answer("🔑 Yangi maxfiy parolni kiriting (kamida 4 ta belgi):")
+    await state.set_state(AdminStates.waiting_new_pass)
+    await cq.answer()
+
+
+@router.message(AdminStates.waiting_new_pass)
+async def admin_save_pass(msg: Message, state: FSMContext):
+    if not check_admin(msg.from_user.id):
+        return
+    new_pass = msg.text.strip()
+    if len(new_pass) < 4:
+        await msg.answer("❌ Parol kamida 4 ta belgidan iborat bo'lishi kerak. Qaytadan kiriting:")
+        return
+    db.set_setting("admin_password", new_pass)
+    await msg.answer(f"✅ Maxfiy parol o'zgartirildi!\n\nYangi parol: <code>{new_pass}</code>")
+    await state.clear()
+    await show_admin_panel(msg)
+
+
+@router.callback_query(F.data == "admin_close")
+async def admin_close_panel(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    await cq.message.delete()
+    await cq.answer("🔒 Maxfiy Admin Panel yopildi.")
+
+
+@router.callback_query(F.data == "admin_back")
+async def admin_back_menu(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    await show_admin_panel(cq)
