@@ -301,6 +301,71 @@ def log_send(campaign_id: int, account_id: int, group_id: int, status: str, erro
         )
 
 
+def get_statistics(user_id: int) -> dict:
+    with get_conn() as conn:
+        acc_total = conn.execute("SELECT COUNT(*) FROM accounts WHERE user_id=?", (user_id,)).fetchone()[0]
+        acc_active = conn.execute("SELECT COUNT(*) FROM accounts WHERE user_id=? AND is_active=1", (user_id,)).fetchone()[0]
+        
+        grp_total = conn.execute("SELECT COUNT(*) FROM groups WHERE user_id=?", (user_id,)).fetchone()[0]
+        
+        camp_total = conn.execute("SELECT COUNT(*) FROM campaigns WHERE user_id=?", (user_id,)).fetchone()[0]
+        camp_active = conn.execute("SELECT COUNT(*) FROM campaigns WHERE user_id=? AND is_active=1", (user_id,)).fetchone()[0]
+        
+        sent_today = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='sent' AND date(sl.sent_at) = date('now')
+        """, (user_id,)).fetchone()[0]
+        
+        failed_today = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='failed' AND date(sl.sent_at) = date('now')
+        """, (user_id,)).fetchone()[0]
+        
+        sent_total = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='sent'
+        """, (user_id,)).fetchone()[0]
+        
+        failed_total = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='failed'
+        """, (user_id,)).fetchone()[0]
+        
+        errors = conn.execute("""
+            SELECT sl.error, sl.sent_at, g.title, g.identifier
+            FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            LEFT JOIN groups g ON sl.group_id = g.id
+            WHERE c.user_id=? AND sl.status='failed' AND sl.error != ''
+            ORDER BY sl.id DESC LIMIT 5
+        """, (user_id,)).fetchall()
+        
+        error_list = []
+        for r in errors:
+            error_list.append({
+                "error": r["error"],
+                "sent_at": r["sent_at"],
+                "group": r["title"] or r["identifier"] or "Noma'lum"
+            })
+            
+        return {
+            "acc_total": acc_total,
+            "acc_active": acc_active,
+            "grp_total": grp_total,
+            "camp_total": camp_total,
+            "camp_active": camp_active,
+            "sent_today": sent_today,
+            "failed_today": failed_today,
+            "sent_total": sent_total,
+            "failed_total": failed_total,
+            "recent_errors": error_list
+        }
+
+
 # ── Allowed Users & Settings (Secret Admin Panel) ─────────────────────────────
 
 def is_user_allowed(user_id: int) -> bool:

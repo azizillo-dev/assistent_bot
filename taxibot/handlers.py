@@ -10,7 +10,7 @@ import logging
 import re
 import html as html_lib
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -111,6 +111,13 @@ def main_kb() -> ReplyKeyboardMarkup:
     )
 
 
+def cancel_kb() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="❌ Bekor qilish")]],
+        resize_keyboard=True,
+    )
+
+
 def ik(*buttons: tuple) -> InlineKeyboardMarkup:
     """Inline keyboard yasash: [(text, callback), ...]"""
     return InlineKeyboardMarkup(
@@ -145,6 +152,45 @@ async def cmd_start(msg: Message):
     )
 
 
+@router.message(Command("cancel", "bekor", "orqaga"))
+@router.message(F.text.in_({"❌ Bekor qilish", "◀️ Orqaga", "/cancel", "/bekor", "/orqaga"}))
+async def global_cancel_handler(msg: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is None:
+        await msg.answer("Hozir hech qanday jarayonda emassiz.", reply_markup=main_kb())
+        return
+    await state.clear()
+    
+    if current_state in (AdminStates.waiting_add_id.state, AdminStates.waiting_limit.state, AdminStates.waiting_new_pass.state) and check_admin(msg.from_user.id):
+        await msg.answer("❌ Jarayon bekor qilindi. Admin panelga qaytdingiz.", reply_markup=ReplyKeyboardRemove())
+        await show_admin_panel(msg)
+    else:
+        await msg.answer("❌ Jarayon bekor qilindi. Asosiy menyuga qaytdingiz.", reply_markup=main_kb())
+
+
+@router.message(Command("statistika", "stats", "stat"))
+async def cmd_statistika(msg: Message):
+    if not allowed(msg.from_user.id):
+        return
+    stats = db.get_statistics(msg.from_user.id)
+    text = (
+        "<b>📊 AvtoPost Statistika</b>\n\n"
+        f"📱 Akkauntlar: <b>{stats['acc_total']} ta</b> ({stats['acc_active']} ta aktiv)\n"
+        f"👥 Guruhlar: <b>{stats['grp_total']} ta</b>\n"
+        f"📢 Kampaniyalar: <b>{stats['camp_total']} ta</b> ({stats['camp_active']} ta aktiv)\n\n"
+        f"📨 Bugun yuborildi: <b>{stats['sent_today']} ta</b> ✅ | <b>{stats['failed_today']} ta</b> ❌\n"
+        f"📦 Jami yuborilgan: <b>{stats['sent_total']} ta</b> ✅ | <b>{stats['failed_total']} ta</b> ❌\n"
+    )
+    if stats["recent_errors"]:
+        text += "\n<b>⚠️ So'nggi xatoliklar (Oxirgi 5 ta):</b>\n"
+        for err in stats["recent_errors"]:
+            text += f"• <code>[{err['sent_at']}]</code> {err['group']}: <i>{err['error'][:40]}</i>\n"
+    else:
+        text += "\n✨ So'nggi paytlarda hech qanday xatolik qayd etilmagan."
+        
+    await msg.answer(text, reply_markup=main_kb())
+
+
 # ── AKKAUNTLAR ────────────────────────────────────────────────────────────────
 
 @router.message(F.text == "📱 Akkauntlar")
@@ -174,7 +220,7 @@ async def menu_accounts(msg: Message):
 async def acc_add_start(cq: CallbackQuery, state: FSMContext):
     if not allowed(cq.from_user.id):
         return await cq.answer()
-    await cq.message.answer("📞 Telefon raqamingizni kiriting (+998901234567):")
+    await cq.message.answer("📞 Telefon raqamingizni kiriting (+998901234567):", reply_markup=cancel_kb())
     await state.set_state(LoginStates.waiting_phone)
     await cq.answer()
 
@@ -322,7 +368,8 @@ async def grp_add_start(cq: CallbackQuery, state: FSMContext):
     await cq.message.answer(
         "📋 Guruh yoki kanal identifikatorini kiriting:\n\n"
         "• Username: <code>@mygroupname</code>\n"
-        "• ID: <code>-1001234567890</code>"
+        "• ID: <code>-1001234567890</code>",
+        reply_markup=cancel_kb()
     )
     await state.set_state(GroupStates.waiting_identifier)
     await cq.answer()
@@ -667,7 +714,7 @@ async def camp_new_start(cq: CallbackQuery, state: FSMContext):
     if not grps:
         await cq.message.answer("❌ Avval guruh qo'shing!")
         return await cq.answer()
-    await cq.message.answer("📝 Kampaniya nomini kiriting:")
+    await cq.message.answer("📝 Kampaniya nomini kiriting:", reply_markup=cancel_kb())
     await state.set_state(CampaignStates.waiting_name)
     await cq.answer()
 
@@ -863,6 +910,7 @@ async def camp_grp_done(cq: CallbackQuery, state: FSMContext):
         f"👥 Guruhlar: {len(selected_grps)} ta\n\n"
         f"Bot darhol ishga tushadi."
     )
+    await cq.message.answer("🎉 Kampaniya muvaffaqiyatli saqlandi!", reply_markup=main_kb())
     await state.clear()
     await cq.answer()
 
@@ -952,7 +1000,7 @@ async def camp_edit_text_start(cq: CallbackQuery, state: FSMContext):
         return await cq.answer()
     cid = int(cq.data.split("_")[-1])
     await state.update_data(edit_camp_id=cid)
-    await cq.message.answer("✏️ Yangi matnni kiriting:")
+    await cq.message.answer("✏️ Yangi matnni kiriting:", reply_markup=cancel_kb())
     await state.set_state(EditStates.waiting_new_text)
     await cq.answer()
 
@@ -976,7 +1024,7 @@ async def camp_edit_int_start(cq: CallbackQuery, state: FSMContext):
         return await cq.answer()
     cid = int(cq.data.split("_")[-1])
     await state.update_data(edit_camp_id=cid)
-    await cq.message.answer("⏱ Yangi interval (minutda, masalan 5):")
+    await cq.message.answer("⏱ Yangi interval (minutda, masalan 5):", reply_markup=cancel_kb())
     await state.set_state(EditStates.waiting_new_interval)
     await cq.answer()
 
@@ -1011,7 +1059,8 @@ async def camp_edit_acc_int_start(cq: CallbackQuery, state: FSMContext):
         f"⏳ <b>Akkauntlar orasidagi interval</b>\n\n"
         f"Hozirgi qiymat: <b>{current} soniya</b>\n\n"
         f"Yangi qiymatni kiriting (soniyada):\n"
-        f"Masalan: <code>2</code>, <code>5</code>, <code>10</code>, <code>30</code>"
+        f"Masalan: <code>2</code>, <code>5</code>, <code>10</code>, <code>30</code>",
+        reply_markup=cancel_kb()
     )
     await state.set_state(EditStates.waiting_new_acc_interval)
     await cq.answer()
@@ -1118,7 +1167,8 @@ async def camp_bulk_edit_start(cq: CallbackQuery, state: FSMContext):
         f"✏️ <b>Barcha kampaniyalar matnini o'zgartirish</b>\n\n"
         f"Sizda <b>{count} ta</b> kampaniya bor.\n"
         f"Yangi matnni kiriting — <b>barchasi</b> shu matnni oladi:\n\n"
-        f"⚠️ Bu amalni bekor qilib bo'lmaydi!"
+        f"⚠️ Bu amalni bekor qilib bo'lmaydi!",
+        reply_markup=cancel_kb()
     )
     await state.set_state(EditStates.waiting_bulk_text)
     await cq.answer()
@@ -1191,7 +1241,7 @@ async def menu_status(msg: Message):
 
 @router.message(Command("root"))
 async def cmd_root(msg: Message, state: FSMContext):
-    await msg.answer("🔐 Maxsus boshqaruv tizimi. Parolni kiriting:")
+    await msg.answer("🔐 Maxsus boshqaruv tizimi. Parolni kiriting:", reply_markup=cancel_kb())
     await state.set_state(AdminStates.waiting_password)
 
 
@@ -1251,7 +1301,7 @@ async def admin_list_users_handler(cq: CallbackQuery):
 async def admin_add_user_start(cq: CallbackQuery, state: FSMContext):
     if not check_admin(cq.from_user.id):
         return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
-    await cq.message.answer("➕ Yangi foydalanuvchining Telegram ID raqamini kiriting (yoki xabarini shu yerga forward qiling):")
+    await cq.message.answer("➕ Yangi foydalanuvchining Telegram ID raqamini kiriting (yoki xabarini shu yerga forward qiling):", reply_markup=cancel_kb())
     await state.set_state(AdminStates.waiting_add_id)
     await cq.answer()
 
@@ -1272,9 +1322,9 @@ async def admin_save_new_user(msg: Message, state: FSMContext):
         new_id = int(text)
     
     if db.add_allowed_user(new_id):
-        await msg.answer(f"✅ Foydalanuvchi <code>{new_id}</code> ruxsat etilganlar ro'yxatiga qo'shildi!")
+        await msg.answer(f"✅ Foydalanuvchi <code>{new_id}</code> ruxsat etilganlar ro'yxatiga qo'shildi!", reply_markup=ReplyKeyboardRemove())
     else:
-        await msg.answer(f"⚠️ Ushbu ID <code>{new_id}</code> allaqachon ro'yxatda bor.")
+        await msg.answer(f"⚠️ Ushbu ID <code>{new_id}</code> allaqachon ro'yxatda bor.", reply_markup=ReplyKeyboardRemove())
     await state.clear()
     await show_admin_panel(msg)
 
@@ -1313,7 +1363,7 @@ async def admin_edit_limit_start(cq: CallbackQuery, state: FSMContext):
     if not check_admin(cq.from_user.id):
         return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
     current = get_max_accounts()
-    await cq.message.answer(f"⚙️ Hozirgi akkauntlar limiti: <b>{current} ta</b>.\n\nYangi limit sonini kiriting (masalan: 5, 10, 50):")
+    await cq.message.answer(f"⚙️ Hozirgi akkauntlar limiti: <b>{current} ta</b>.\n\nYangi limit sonini kiriting (masalan: 5, 10, 50):", reply_markup=cancel_kb())
     await state.set_state(AdminStates.waiting_limit)
     await cq.answer()
 
@@ -1328,7 +1378,7 @@ async def admin_save_limit(msg: Message, state: FSMContext):
         return
     new_limit = int(text)
     db.set_setting("max_accounts", str(new_limit))
-    await msg.answer(f"✅ Akkauntlar limiti <b>{new_limit} ta</b> qilib o'rnatildi!")
+    await msg.answer(f"✅ Akkauntlar limiti <b>{new_limit} ta</b> qilib o'rnatildi!", reply_markup=ReplyKeyboardRemove())
     await state.clear()
     await show_admin_panel(msg)
 
@@ -1337,7 +1387,7 @@ async def admin_save_limit(msg: Message, state: FSMContext):
 async def admin_edit_pass_start(cq: CallbackQuery, state: FSMContext):
     if not check_admin(cq.from_user.id):
         return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
-    await cq.message.answer("🔑 Yangi maxfiy parolni kiriting (kamida 4 ta belgi):")
+    await cq.message.answer("🔑 Yangi maxfiy parolni kiriting (kamida 4 ta belgi):", reply_markup=cancel_kb())
     await state.set_state(AdminStates.waiting_new_pass)
     await cq.answer()
 
@@ -1351,7 +1401,7 @@ async def admin_save_pass(msg: Message, state: FSMContext):
         await msg.answer("❌ Parol kamida 4 ta belgidan iborat bo'lishi kerak. Qaytadan kiriting:")
         return
     db.set_setting("admin_password", new_pass)
-    await msg.answer(f"✅ Maxfiy parol o'zgartirildi!\n\nYangi parol: <code>{new_pass}</code>")
+    await msg.answer(f"✅ Maxfiy parol o'zgartirildi!\n\nYangi parol: <code>{new_pass}</code>", reply_markup=ReplyKeyboardRemove())
     await state.clear()
     await show_admin_panel(msg)
 
