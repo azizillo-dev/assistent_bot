@@ -1413,8 +1413,18 @@ async def admin_list_users_handler(cq: CallbackQuery):
     buttons = []
     for i, u in enumerate(users, 1):
         uid = u["user_id"]
-        name = u["name"] or "Noma'lum"
-        uname = f" (@{u['username']})" if u["username"] else ""
+        name = u["name"]
+        username = u["username"]
+        if not name or name == "Noma'lum":
+            try:
+                chat_info = await cq.bot.get_chat(uid)
+                name = f"{chat_info.first_name or ''} {chat_info.last_name or ''}".strip() or getattr(chat_info, "title", None) or "Noma'lum"
+                username = getattr(chat_info, "username", None) or ""
+                db.update_user_info(uid, name, username)
+            except Exception:
+                name = "Noma'lum"
+        
+        uname = f" (@{username})" if username else ""
         status = "⏸ Pauza" if u["is_paused"] else "🟢 Faol"
         text += f"{i}. <code>{uid}</code> — <b>{html_lib.escape(name)}</b>{uname} [{status}]\n"
         buttons.append((f"👤 {name[:12]} ({uid})", f"admin_manage_user_{uid}"))
@@ -1433,9 +1443,21 @@ async def admin_manage_user_handler(cq: CallbackQuery):
     if not uinfo:
         return await cq.answer("Topilmadi", show_alert=True)
     
-    name = uinfo["name"] or "Noma'lum"
-    uname = f" (@{uinfo['username']})" if uinfo["username"] else ""
+    name = uinfo["name"]
+    username = uinfo["username"]
+    if not name or name == "Noma'lum":
+        try:
+            chat_info = await cq.bot.get_chat(uid)
+            name = f"{chat_info.first_name or ''} {chat_info.last_name or ''}".strip() or getattr(chat_info, "title", None) or "Noma'lum"
+            username = getattr(chat_info, "username", None) or ""
+            db.update_user_info(uid, name, username)
+        except Exception:
+            name = "Noma'lum"
+            
+    uname = f" (@{username})" if username else ""
     status = "⏸ Pauzada" if uinfo["is_paused"] else "🟢 Faol"
+    
+    stats = db.get_statistics(uid)
     
     text = (
         f"👤 <b>Foydalanuvchi boshqaruvi</b>\n\n"
@@ -1443,6 +1465,12 @@ async def admin_manage_user_handler(cq: CallbackQuery):
         f"👤 Ism: <b>{html_lib.escape(name)}</b>{uname}\n"
         f"ℹ️ Holat: <b>{status}</b>\n"
         f"📅 Qo'shilgan: <code>{uinfo['added_at']}</code>\n\n"
+        f"📊 <b>Foydalanuvchi faoliyati:</b>\n"
+        f"• 📱 Akkauntlar: <b>{stats['acc_total']} ta</b> ({stats['acc_active']} ta aktiv)\n"
+        f"• 👥 Guruhlar: <b>{stats['grp_total']} ta</b>\n"
+        f"• 📢 Kampaniyalar: <b>{stats['camp_total']} ta</b> (🟢 <b>{stats['camp_active']} ta faol</b>)\n"
+        f"• 📨 Bugun yuborildi: <b>{stats['sent_today']} ta</b> ✅ | <b>{stats['failed_today']} ta</b> ❌\n"
+        f"• 📦 Jami yuborilgan: <b>{stats['sent_total']} ta</b>\n\n"
         "Kerakli amalni tanlang:"
     )
     
