@@ -90,6 +90,7 @@ class AdminStates(StatesGroup):
     waiting_del_id   = State()
     waiting_limit    = State()
     waiting_new_pass = State()
+    waiting_new_help = State()
 
 class LoginStates(StatesGroup):
     waiting_phone = State()
@@ -177,7 +178,7 @@ async def global_cancel_handler(msg: Message, state: FSMContext):
         return
     await state.clear()
     
-    if current_state in (AdminStates.waiting_add_id.state, AdminStates.waiting_limit.state, AdminStates.waiting_new_pass.state) and check_admin(msg.from_user.id):
+    if current_state in (AdminStates.waiting_add_id.state, AdminStates.waiting_limit.state, AdminStates.waiting_new_pass.state, AdminStates.waiting_new_help.state) and check_admin(msg.from_user.id):
         await msg.answer("❌ Jarayon bekor qilindi. Admin panelga qaytdingiz.", reply_markup=ReplyKeyboardRemove())
         await show_admin_panel(msg)
     else:
@@ -204,6 +205,34 @@ async def cmd_statistika(msg: Message):
     else:
         text += "\n✨ So'nggi paytlarda hech qanday xatolik qayd etilmagan."
         
+    await msg.answer(text, reply_markup=main_kb())
+
+
+DEFAULT_HELP_TEXT = """<b>ℹ️ AutoPost Bot — To'liq Qo'llanma va Yo'riqnoma</b>
+
+Bu bot Telegram akkauntlaringiz orqali ko'plab guruhlarga avtomatlashtirilgan tarzda reklama va e'lonlar tarqatish uchun mo'ljallangan.
+
+<b>1️⃣ QANDAY BOSHLASH KERAK?</b>
+• <b>📱 Akkauntlar:</b> Bu bo'limga kirib, "➕ Yangi akkaunt qo'shish" tugmasini bosing. Telefon raqamingizni (masalan: <i>+998901234567</i>) kiriting va Telegramdan kelgan tasdiqlash kodini yuboring.
+• <b>👥 Guruhlar:</b> "➕ Yangi guruh qo'shish" orqali e'lon tarqatiladigan guruhlarning linkini (masalan: <i>@guruh_linki</i>) yoki ID raqamini (<i>-100...</i>) qo'shing.
+• <b>📢 Kampaniyalar:</b> Akkauntlar va guruhlarni tayyorlab bo'lgach, "➕ Yangi kampaniya" yarating. Unga nom, xabar matni, har necha daqiqada yuborilishi (interval) va qaysi akkaunt/guruhlar qatnashishini belgilab, <b>🟢 Ishga tushiring</b>!
+
+<b>2️⃣ MUHIM QOIDALAR VA E'TIBOR BERISH KERAK BO'LGAN JIHATLAR!</b>
+⚠️ <b>Yopiq va taqiqlangan guruhlar:</b> Botga qo'shilgan guruhlarda yozish yopib qo'yilmaganiga (yada faqat adminlar yozadigan emasligiga) va sizning akkauntingiz u guruhda ban bo'lmaganiga ishonch hosil qiling! Yopiq guruhlar xabar yuborishda xatolik yuzaga keltirib, loglarda ❌ to'planib qolishiga sabab bo'ladi.
+⚠️ <b>Sessiyalar faolligi:</b> Ulangan akkauntlaringizni Telegramdan "Boshqa qurilmalardan chiqish" qilib yubormang! Agar sessiyadan o'chib ketsa, "📱 Akkauntlar" bo'limidan eski akkauntni o'chirib, qayta ulab oling.
+⚠️ <b>Spamblock va Limitlar:</b> Telegram bitta akkauntdan juda tez va juda ko'p xabar yozishni cheklashi (spamblock) mumkin. Shuning uchun:
+  • Bir necha akkaunt (masalan 3-5 ta) ulab qo'ying, shunda bot yuklamani akkauntlarga taqsimlaydi;
+  • Kampaniya intervalini juda qisqa (masalan 1-2 daqiqa) qilmang, o'rtacha 15-30 daqiqa eng xavfsiz va samarali interval hisoblanadi.
+
+<b>3️⃣ HOLAT VA NAZORAT</b>
+• <b>ℹ️ Holat:</b> Bu bo'lim orqali qaysi kampaniya qachon ishlashi, bugun nechta xabar muvaffaqiyatli (✅) va nechta xato (❌) ketganini nazorat qilib borishingiz mumkin."""
+
+
+@router.message(Command("yordam", "help"))
+async def cmd_yordam(msg: Message):
+    if not allowed(msg.from_user.id):
+        return
+    text = db.get_setting("help_text", DEFAULT_HELP_TEXT)
     await msg.answer(text, reply_markup=main_kb())
 
 
@@ -1298,6 +1327,7 @@ async def show_admin_panel(event: Message | CallbackQuery):
         ("🗑 Foydalanuvchi o'chirish", "admin_del_user"),
         ("⚙️ Limitni o'zgartirish", "admin_edit_limit"),
         ("🔑 Parolni o'zgartirish", "admin_edit_pass"),
+        ("📝 /yordam matnini tahrirlash", "admin_edit_help"),
         ("🔒 Panelni yopish", "admin_close")
     )
     
@@ -1537,3 +1567,32 @@ async def admin_back_menu(cq: CallbackQuery):
     if not check_admin(cq.from_user.id):
         return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
     await show_admin_panel(cq)
+
+
+@router.callback_query(F.data == "admin_edit_help")
+async def admin_edit_help_start(cq: CallbackQuery, state: FSMContext):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    await cq.message.answer(
+        "📝 <b>/yordam (Qo'llanma) matnini tahrirlash</b>\n\n"
+        "Yangi matnni (HTML formatda) yuboring.\n"
+        "<i>Eski standart (default) holatiga qaytarish uchun /default buyrug'ini yuboring.</i>",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(AdminStates.waiting_new_help)
+    await cq.answer()
+
+
+@router.message(AdminStates.waiting_new_help)
+async def admin_save_help(msg: Message, state: FSMContext):
+    if not check_admin(msg.from_user.id):
+        return
+    if msg.text and msg.text.strip() == "/default":
+        db.set_setting("help_text", DEFAULT_HELP_TEXT)
+        await msg.answer("✅ /yordam matni standart (default) holatga qaytarildi!", reply_markup=ReplyKeyboardRemove())
+    else:
+        new_text = msg.html_text if hasattr(msg, 'html_text') and msg.html_text else msg.text
+        db.set_setting("help_text", new_text)
+        await msg.answer("✅ /yordam qo'llanma matni yangilandi!", reply_markup=ReplyKeyboardRemove())
+    await state.clear()
+    await show_admin_panel(msg)
