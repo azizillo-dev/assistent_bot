@@ -84,26 +84,50 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS allowed_users (
-            user_id  INTEGER PRIMARY KEY,
-            added_at TEXT    DEFAULT (datetime('now'))
+            user_id   INTEGER PRIMARY KEY,
+            name      TEXT    DEFAULT '',
+            username  TEXT    DEFAULT '',
+            is_paused INTEGER DEFAULT 0,
+            added_at  TEXT    DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS settings (
             key   TEXT PRIMARY KEY,
             value TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS sent_messages (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id      INTEGER NOT NULL,
+            session_name TEXT    NOT NULL,
+            chat_id      INTEGER NOT NULL,
+            message_id   INTEGER NOT NULL,
+            sent_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_sent_messages_time ON sent_messages(sent_at);
+
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id         INTEGER PRIMARY KEY,
+            auto_delete_24h INTEGER DEFAULT 1,
+            night_mode      INTEGER DEFAULT 0,
+            speed_mode      TEXT    DEFAULT 'normal',
+            notify_finish   INTEGER DEFAULT 1
+        );
         """)
 
     # Eski DB uchun yangi ustunlarni qo'shish (migration)
     with get_conn() as conn:
-        try:
-            conn.execute("ALTER TABLE campaigns ADD COLUMN acc_interval_s INTEGER NOT NULL DEFAULT 2")
-        except Exception:
-            pass
-        try:
-            conn.execute("ALTER TABLE campaigns ADD COLUMN font_style TEXT NOT NULL DEFAULT 'none'")
-        except Exception:
-            pass
+        for col, col_type in [("acc_interval_s", "INTEGER NOT NULL DEFAULT 2"), ("font_style", "TEXT NOT NULL DEFAULT 'none'")]:
+            try:
+                conn.execute(f"ALTER TABLE campaigns ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
+
+        for col, col_type in [("name", "TEXT DEFAULT ''"), ("username", "TEXT DEFAULT ''"), ("is_paused", "INTEGER DEFAULT 0")]:
+            try:
+                conn.execute(f"ALTER TABLE allowed_users ADD COLUMN {col} {col_type}")
+            except Exception:
+                pass
 
         # Boshlang'ich ruxsat etilgan foydalanuvchilar va sozlamalar migratsiyasi
         try:
@@ -115,6 +139,7 @@ def init_db():
             
             conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", ("max_accounts", str(getattr(config, "MAX_ACCOUNTS_PER_USER", 20))))
             conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", ("admin_password", getattr(config, "ADMIN_PASSWORD", "Senior0307")))
+            conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", ("global_pause", "0"))
         except Exception as e:
             print(f"Migration error: {e}")
 
@@ -404,4 +429,83 @@ def get_setting(key: str, default: str = "") -> str:
 def set_setting(key: str, value: str):
     with get_conn() as conn:
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
+
+
+def update_user_info(user_id: int, name: str, username: str):
+    name = (name or "").strip()
+    username = (username or "").strip()
+    with get_conn() as conn:
+        row = conn.execute("SELECT 1 FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        if row:
+            conn.execute("UPDATE allowed_users SET name=?, username=? WHERE user_id=?", (name, username, user_id))
+        else:
+            conn.execute("INSERT OR IGNORE INTO allowed_users (user_id, name, username) VALUES (?, ?, ?)", (user_id, name, username))
+
+
+def is_user_paused(user_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute("SELECT is_paused FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        return bool(row and row["is_paused"] == 1)
+
+
+def set_user_pause(user_id: int, is_paused: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE allowed_users SET is_paused=? WHERE user_id=?", (is_paused, user_id))
+
+
+def get_all_allowed_users_detailed() -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT user_id, name, username, is_paused, added_at FROM allowed_users ORDER BY added_at ASC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_user_info(user_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT user_id, name, username, is_paused, added_at FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_settings(user_id: int) -> dict:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM user_settings WHERE user_id=?", (user_id,)).fetchone()
+        if not row:
+            conn.execute("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,))
+            return {"user_id": user_id, "auto_delete_24h": 1, "night_mode": 0, "speed_mode": "normal", "notify_finish": 1}
+        return dict(row)
+
+
+def update_user_setting(user_id: int, key: str, value: any):
+    if key not in ("auto_delete_24h", "night_mode", "speed_mode", "notify_finish"):
+        return
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,))
+        conn.execute(f"UPDATE user_settings SET {key}=? WHERE user_id=?", (value, user_id))
+
+
+def save_sent_message(user_id: int, session_name: str, chat_id: int, message_id: int):
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT INTO sent_messages (user_id, session_name, chat_id, message_id) VALUES (?, ?, ?, ?)",
+                (user_id, session_name, chat_id, message_id)
+            )
+    except Exception:
+        pass
+
+
+def get_old_sent_messages(hours: int = 24, limit: int = 500) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT id, user_id, session_name, chat_id, message_id, sent_at FROM sent_messages WHERE sent_at <= datetime('now', '-{hours} hours') LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_sent_messages_records(ids: list[int]):
+    if not ids:
+        return
+    with get_conn() as conn:
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(f"DELETE FROM sent_messages WHERE id IN ({placeholders})", ids)
 

@@ -103,9 +103,9 @@ async def send_message(
     group_identifier: str,
     text: str,
     font_style: str = "none",
-) -> bool:
+) -> tuple[int, int]:
     """
-    Xabar yuboradi. True — muvaffaqiyat. SendError — xato.
+    Xabar yuboradi. (chat_id, message_id) qaytaradi. SendError — xato.
     """
     client = await session_manager.get_client(session_name)
     if not await client.is_user_authorized():
@@ -119,8 +119,14 @@ async def send_message(
     await asyncio.sleep(random.uniform(1.0, 4.0))
 
     try:
-        await client.send_message(target, invisib_text, parse_mode="html")
-        return True
+        msg = await client.send_message(target, invisib_text, parse_mode="html")
+        chat_id = getattr(msg, "chat_id", 0) or getattr(msg, "peer_id", 0) or 0
+        if hasattr(chat_id, "channel_id"):
+            chat_id = int(f"-100{chat_id.channel_id}")
+        elif hasattr(chat_id, "chat_id"):
+            chat_id = int(f"-{chat_id.chat_id}")
+        msg_id = getattr(msg, "id", 0)
+        return int(chat_id), int(msg_id)
 
     except FloodWaitError as e:
         wait = int(getattr(e, "seconds", 60))

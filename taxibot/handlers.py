@@ -23,13 +23,29 @@ from sessions_mgr import session_manager
 logger = logging.getLogger(__name__)
 router = Router()
 
-# ── Ruxsat filtri ─────────────────────────────────────────────────────────────
+# ── Ruxsat filtri va Middleware ────────────────────────────────────────────────
+
+@router.message.outer_middleware()
+async def user_info_msg_mw(handler, event: Message, data: dict):
+    if event.from_user:
+        db.update_user_info(event.from_user.id, event.from_user.full_name, event.from_user.username)
+    return await handler(event, data)
+
+
+@router.callback_query.outer_middleware()
+async def user_info_cq_mw(handler, event: CallbackQuery, data: dict):
+    if event.from_user:
+        db.update_user_info(event.from_user.id, event.from_user.full_name, event.from_user.username)
+    return await handler(event, data)
+
 
 def allowed(user_id: int) -> bool:
-    return db.is_user_allowed(user_id)
+    return db.is_user_allowed(user_id) and not db.is_user_paused(user_id)
 
 
-def access_denied():
+def access_denied(user_id: int = 0):
+    if user_id and db.is_user_paused(user_id):
+        return "⚠️ <b>Sizning hisobingiz vaqtincha to'xtatilgan (pauza qilingan).</b>\n\nIltimos, bot ma'muriyati bilan bog'laning."
     return "⛔ Sizga ruxsat yo'q."
 
 
@@ -106,6 +122,7 @@ def main_kb() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text="📱 Akkauntlar"), KeyboardButton(text="👥 Guruhlar")],
             [KeyboardButton(text="📢 Kampaniyalar"), KeyboardButton(text="ℹ️ Holat")],
+            [KeyboardButton(text="⚙️ Sozlamalar")],
         ],
         resize_keyboard=True,
     )
@@ -142,7 +159,7 @@ def font_kb(current: str = "none") -> InlineKeyboardMarkup:
 @router.message(CommandStart())
 async def cmd_start(msg: Message):
     if not allowed(msg.from_user.id):
-        await msg.answer(access_denied())
+        await msg.answer(access_denied(msg.from_user.id))
         return
     await msg.answer(
         "✅ <b>AutoPost Bot</b>\n\n"
@@ -189,6 +206,90 @@ async def cmd_statistika(msg: Message):
         text += "\n✨ So'nggi paytlarda hech qanday xatolik qayd etilmagan."
         
     await msg.answer(text, reply_markup=main_kb())
+
+
+# ── SOZLAMALAR (/settings) ────────────────────────────────────────────────────
+
+@router.message(Command("settings", "sozlamalar"))
+@router.message(F.text == "⚙️ Sozlamalar")
+async def cmd_settings(msg: Message):
+    if not allowed(msg.from_user.id):
+        await msg.answer(access_denied(msg.from_user.id))
+        return
+    await show_settings_menu(msg)
+
+
+async def show_settings_menu(event: Message | CallbackQuery):
+    uid = event.from_user.id
+    s = db.get_user_settings(uid)
+    
+    autodel_str = "✅ Yoqilgan (Har 24 soatda)" if s["auto_delete_24h"] else "❌ O'chirilgan"
+    night_str = "✅ Yoqilgan (00:00 - 06:00)" if s["night_mode"] else "❌ O'chirilgan"
+    speed_map = {"safe": "🔵 Xavfsiz (30-60s)", "normal": "🟢 O'rtacha (15-30s)", "fast": "🔴 Tezkor (5-10s)"}
+    speed_str = speed_map.get(s["speed_mode"], "🟢 O'rtacha (15-30s)")
+    notify_str = "✅ Yoqilgan" if s["notify_finish"] else "❌ O'chirilgan"
+    
+    text = (
+        "<b>⚙️ Bot Sozlamalari (/settings)</b>\n\n"
+        "Bot ishlashini o'zingizga qulay qilib moslang:\n\n"
+        f"🗑 <b>24 soatlik xabarlarni o'chirish:</b> {autodel_str}\n"
+        f"<i>(Guruhlarda spamsiz va toza turish uchun har 24 soatda eski e'lonlar avtomatsiz o'chiriladi)</i>\n\n"
+        f"😴 <b>Tungi tinchlik rejimi:</b> {night_str}\n"
+        f"<i>(Tunda 00:00 dan 06:00 gacha tarqatish avtomat to'xtatiladi)</i>\n\n"
+        f"⚡️ <b>Tarqatish tezligi:</b> {speed_str}\n"
+        f"<i>(Akkauntlar orasidagi xavfsiz interval)</i>\n\n"
+        f"🔔 <b>Hisobot xabarnomasi:</b> {notify_str}"
+    )
+    
+    kb = ik(
+        (f"🗑 24s Avto-o'chirish: {'✅' if s['auto_delete_24h'] else '❌'}", f"set_toggle_auto_delete_{0 if s['auto_delete_24h'] else 1}"),
+        (f"😴 Tungi rejim: {'✅' if s['night_mode'] else '❌'}", f"set_toggle_night_{0 if s['night_mode'] else 1}"),
+        (f"⚡️ Tezlik: {speed_str[:12]}", "set_change_speed"),
+        (f"🔔 Hisobotlar: {'✅' if s['notify_finish'] else '❌'}", f"set_toggle_notify_{0 if s['notify_finish'] else 1}"),
+        ("◀️ Yopish", "set_close")
+    )
+    if isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, reply_markup=kb)
+    else:
+        await event.answer(text, reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("set_toggle_"))
+async def settings_toggle_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer(access_denied(cq.from_user.id), show_alert=True)
+    parts = cq.data.split("_")
+    if "auto" in cq.data:
+        key = "auto_delete_24h"
+        val = int(parts[-1])
+    elif "night" in cq.data:
+        key = "night_mode"
+        val = int(parts[-1])
+    else:
+        key = "notify_finish"
+        val = int(parts[-1])
+    
+    db.update_user_setting(cq.from_user.id, key, val)
+    await cq.answer("✅ Sozlama o'zgartirildi!")
+    await show_settings_menu(cq)
+
+
+@router.callback_query(F.data == "set_change_speed")
+async def settings_speed_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer(access_denied(cq.from_user.id), show_alert=True)
+    s = db.get_user_settings(cq.from_user.id)
+    curr = s["speed_mode"]
+    nxt = "normal" if curr == "safe" else ("fast" if curr == "normal" else "safe")
+    db.update_user_setting(cq.from_user.id, "speed_mode", nxt)
+    await cq.answer(f"⚡️ Tezlik o'zgardi: {nxt.upper()}!")
+    await show_settings_menu(cq)
+
+
+@router.callback_query(F.data == "set_close")
+async def settings_close_handler(cq: CallbackQuery):
+    await cq.message.delete()
+    await cq.answer()
 
 
 # ── AKKAUNTLAR ────────────────────────────────────────────────────────────────
@@ -1263,15 +1364,21 @@ async def show_admin_panel(event: Message | CallbackQuery):
     users = db.get_all_allowed_users()
     limit = get_max_accounts()
     
+    g_pause = db.get_setting("global_pause", "0") == "1"
+    g_status = "⏸ PAUZADA (Xabar ketmayapti)" if g_pause else "🟢 FAOL (Ishlamoqda)"
+    g_btn_text = "🟢 Global Pauzani O'chirish" if g_pause else "⏸ Global Pauza qilish"
+    
     text = (
         "<b>🔐 Maxfiy Admin Panel</b>\n\n"
+        f"🌐 Tizim holati: <b>{g_status}</b>\n"
         f"👥 Ruxsat etilgan foydalanuvchilar: <b>{len(users)} ta</b>\n"
         f"📱 Akkauntlar limiti: <b>har bir userga {limit} ta</b>\n\n"
         "Quyidagi menyudan kerakli amallarni bajaring:"
     )
     
     kb = ik(
-        ("👥 Ruxsatlilar ro'yxati", "admin_list_users"),
+        (g_btn_text, "admin_toggle_global_pause"),
+        ("👥 Ruxsatlilar ro'yxati (Boshqaruv)", "admin_list_users"),
         ("➕ Foydalanuvchi qo'shish", "admin_add_user"),
         ("🗑 Foydalanuvchi o'chirish", "admin_del_user"),
         ("⚙️ Limitni o'zgartirish", "admin_edit_limit"),
@@ -1285,16 +1392,84 @@ async def show_admin_panel(event: Message | CallbackQuery):
         await event.answer(text, reply_markup=kb)
 
 
+@router.callback_query(F.data == "admin_toggle_global_pause")
+async def admin_toggle_gpause(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    current = db.get_setting("global_pause", "0") == "1"
+    new_val = "0" if current else "1"
+    db.set_setting("global_pause", new_val)
+    status_str = "🟢 Global Pauza O'CHIRILDI! Bot tarqatishni davom ettiradi." if new_val == "0" else "⏸ Global Pauza YOQILDI! Barcha tarqatishlar to'xtatildi."
+    await cq.answer(status_str, show_alert=True)
+    await show_admin_panel(cq)
+
+
 @router.callback_query(F.data == "admin_list_users")
 async def admin_list_users_handler(cq: CallbackQuery):
     if not check_admin(cq.from_user.id):
         return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
-    users = db.get_all_allowed_users()
+    users = db.get_all_allowed_users_detailed()
     text = "<b>👥 Ruxsat etilgan foydalanuvchilar ro'yxati:</b>\n\n"
-    for i, uid in enumerate(users, 1):
-        text += f"{i}. <code>{uid}</code>\n"
-    await cq.message.edit_text(text, reply_markup=ik(("◀️ Orqaga", "admin_back")))
+    buttons = []
+    for i, u in enumerate(users, 1):
+        uid = u["user_id"]
+        name = u["name"] or "Noma'lum"
+        uname = f" (@{u['username']})" if u["username"] else ""
+        status = "⏸ Pauza" if u["is_paused"] else "🟢 Faol"
+        text += f"{i}. <code>{uid}</code> — <b>{html_lib.escape(name)}</b>{uname} [{status}]\n"
+        buttons.append((f"👤 {name[:12]} ({uid})", f"admin_manage_user_{uid}"))
+    
+    buttons.append(("◀️ Orqaga", "admin_back"))
+    await cq.message.edit_text(text, reply_markup=ik(*buttons))
     await cq.answer()
+
+
+@router.callback_query(F.data.startswith("admin_manage_user_"))
+async def admin_manage_user_handler(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    uid = int(cq.data.split("_")[-1])
+    uinfo = db.get_user_info(uid)
+    if not uinfo:
+        return await cq.answer("Topilmadi", show_alert=True)
+    
+    name = uinfo["name"] or "Noma'lum"
+    uname = f" (@{uinfo['username']})" if uinfo["username"] else ""
+    status = "⏸ Pauzada" if uinfo["is_paused"] else "🟢 Faol"
+    
+    text = (
+        f"👤 <b>Foydalanuvchi boshqaruvi</b>\n\n"
+        f"🆔 ID: <code>{uid}</code>\n"
+        f"👤 Ism: <b>{html_lib.escape(name)}</b>{uname}\n"
+        f"ℹ️ Holat: <b>{status}</b>\n"
+        f"📅 Qo'shilgan: <code>{uinfo['added_at']}</code>\n\n"
+        "Kerakli amalni tanlang:"
+    )
+    
+    pause_btn = "🟢 Faollashtirish (Pauzadn chiqarish)" if uinfo["is_paused"] else "⏸ Pauza qilish (To'xtatish)"
+    pause_action = f"admin_upause_{uid}_{0 if uinfo['is_paused'] else 1}"
+    
+    kb = ik(
+        (pause_btn, pause_action),
+        ("❌ Ro'yxatdan o'chirish", f"admin_del_confirm_{uid}"),
+        ("◀️ Orqaga", "admin_list_users")
+    )
+    await cq.message.edit_text(text, reply_markup=kb)
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("admin_upause_"))
+async def admin_exec_upause(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    parts = cq.data.split("_")
+    uid = int(parts[2])
+    val = int(parts[3])
+    db.set_user_pause(uid, val)
+    msg_str = "⏸ Foydalanuvchi pauza qilindi!" if val == 1 else "🟢 Foydalanuvchi faollashtirildi!"
+    await cq.answer(msg_str, show_alert=True)
+    cq.data = f"admin_manage_user_{uid}"
+    await admin_manage_user_handler(cq)
 
 
 @router.callback_query(F.data == "admin_add_user")
