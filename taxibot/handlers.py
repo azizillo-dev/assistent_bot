@@ -122,7 +122,6 @@ def main_kb() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text="📱 Akkauntlar"), KeyboardButton(text="👥 Guruhlar")],
             [KeyboardButton(text="📢 Kampaniyalar"), KeyboardButton(text="ℹ️ Holat")],
-            [KeyboardButton(text="⚙️ Sozlamalar")],
         ],
         resize_keyboard=True,
     )
@@ -206,90 +205,6 @@ async def cmd_statistika(msg: Message):
         text += "\n✨ So'nggi paytlarda hech qanday xatolik qayd etilmagan."
         
     await msg.answer(text, reply_markup=main_kb())
-
-
-# ── SOZLAMALAR (/settings) ────────────────────────────────────────────────────
-
-@router.message(Command("settings", "sozlamalar"))
-@router.message(F.text == "⚙️ Sozlamalar")
-async def cmd_settings(msg: Message):
-    if not allowed(msg.from_user.id):
-        await msg.answer(access_denied(msg.from_user.id))
-        return
-    await show_settings_menu(msg)
-
-
-async def show_settings_menu(event: Message | CallbackQuery):
-    uid = event.from_user.id
-    s = db.get_user_settings(uid)
-    
-    autodel_str = "✅ Yoqilgan (Har 24 soatda)" if s["auto_delete_24h"] else "❌ O'chirilgan"
-    night_str = "✅ Yoqilgan (00:00 - 06:00)" if s["night_mode"] else "❌ O'chirilgan"
-    speed_map = {"safe": "🔵 Xavfsiz (30-60s)", "normal": "🟢 O'rtacha (15-30s)", "fast": "🔴 Tezkor (5-10s)"}
-    speed_str = speed_map.get(s["speed_mode"], "🟢 O'rtacha (15-30s)")
-    notify_str = "✅ Yoqilgan" if s["notify_finish"] else "❌ O'chirilgan"
-    
-    text = (
-        "<b>⚙️ Bot Sozlamalari (/settings)</b>\n\n"
-        "Bot ishlashini o'zingizga qulay qilib moslang:\n\n"
-        f"🗑 <b>24 soatlik xabarlarni o'chirish:</b> {autodel_str}\n"
-        f"<i>(Guruhlarda spamsiz va toza turish uchun har 24 soatda eski e'lonlar avtomatsiz o'chiriladi)</i>\n\n"
-        f"😴 <b>Tungi tinchlik rejimi:</b> {night_str}\n"
-        f"<i>(Tunda 00:00 dan 06:00 gacha tarqatish avtomat to'xtatiladi)</i>\n\n"
-        f"⚡️ <b>Tarqatish tezligi:</b> {speed_str}\n"
-        f"<i>(Akkauntlar orasidagi xavfsiz interval)</i>\n\n"
-        f"🔔 <b>Hisobot xabarnomasi:</b> {notify_str}"
-    )
-    
-    kb = ik(
-        (f"🗑 24s Avto-o'chirish: {'✅' if s['auto_delete_24h'] else '❌'}", f"set_toggle_auto_delete_{0 if s['auto_delete_24h'] else 1}"),
-        (f"😴 Tungi rejim: {'✅' if s['night_mode'] else '❌'}", f"set_toggle_night_{0 if s['night_mode'] else 1}"),
-        (f"⚡️ Tezlik: {speed_str[:12]}", "set_change_speed"),
-        (f"🔔 Hisobotlar: {'✅' if s['notify_finish'] else '❌'}", f"set_toggle_notify_{0 if s['notify_finish'] else 1}"),
-        ("◀️ Yopish", "set_close")
-    )
-    if isinstance(event, CallbackQuery):
-        await event.message.edit_text(text, reply_markup=kb)
-    else:
-        await event.answer(text, reply_markup=kb)
-
-
-@router.callback_query(F.data.startswith("set_toggle_"))
-async def settings_toggle_handler(cq: CallbackQuery):
-    if not allowed(cq.from_user.id):
-        return await cq.answer(access_denied(cq.from_user.id), show_alert=True)
-    parts = cq.data.split("_")
-    if "auto" in cq.data:
-        key = "auto_delete_24h"
-        val = int(parts[-1])
-    elif "night" in cq.data:
-        key = "night_mode"
-        val = int(parts[-1])
-    else:
-        key = "notify_finish"
-        val = int(parts[-1])
-    
-    db.update_user_setting(cq.from_user.id, key, val)
-    await cq.answer("✅ Sozlama o'zgartirildi!")
-    await show_settings_menu(cq)
-
-
-@router.callback_query(F.data == "set_change_speed")
-async def settings_speed_handler(cq: CallbackQuery):
-    if not allowed(cq.from_user.id):
-        return await cq.answer(access_denied(cq.from_user.id), show_alert=True)
-    s = db.get_user_settings(cq.from_user.id)
-    curr = s["speed_mode"]
-    nxt = "normal" if curr == "safe" else ("fast" if curr == "normal" else "safe")
-    db.update_user_setting(cq.from_user.id, "speed_mode", nxt)
-    await cq.answer(f"⚡️ Tezlik o'zgardi: {nxt.upper()}!")
-    await show_settings_menu(cq)
-
-
-@router.callback_query(F.data == "set_close")
-async def settings_close_handler(cq: CallbackQuery):
-    await cq.message.delete()
-    await cq.answer()
 
 
 # ── AKKAUNTLAR ────────────────────────────────────────────────────────────────
