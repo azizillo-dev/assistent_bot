@@ -14,7 +14,7 @@ from sessions_mgr import session_manager
 
 logger = logging.getLogger(__name__)
 
-POLL_INTERVAL = 20  # har 20 soniyada tekshiradi
+POLL_INTERVAL = 10  # har 10 soniyada tekshiradi (1 daqiqalik aylanmalar aniqligi uchun)
 
 
 class CampaignScheduler:
@@ -62,10 +62,10 @@ class CampaignScheduler:
         campaign_id = camp["id"]
         text = camp["message_text"]
         interval = camp["interval_min"]
-        # Akkauntlar orasidagi interval (soniyada), default 2s
-        acc_interval_s = camp.get("acc_interval_s", 2)
-        if not acc_interval_s or acc_interval_s < 1:
-            acc_interval_s = 2
+        # Akkauntlar orasidagi interval (soniyada), default 2s (50+ akkaunt uchun float ham qo'llab-quvvatlanadi)
+        acc_interval_s = float(camp.get("acc_interval_s", 2))
+        if not acc_interval_s or acc_interval_s < 0.5:
+            acc_interval_s = 1.0
         font_style = camp.get("font_style", "none") or "none"
 
         # next_run ni darhol yangilaymiz

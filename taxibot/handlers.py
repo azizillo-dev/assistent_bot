@@ -800,6 +800,7 @@ async def camp_interval(msg: Message, state: FSMContext):
         "⏳ <b>Akkauntlar orasidagi interval</b>\n\n"
         "Har bir akkauntdan xabar yuborgandan keyin necha soniya kutsin?\n\n"
         "Masalan: <code>2</code> (default), <code>5</code>, <code>10</code>, <code>30</code>\n\n"
+        "💡 <i>Eslatma: Agar guruh taymeriga (slow mode 60s) moslab avtomatik ideal interval hisoblamoqchi bo'lsangiz, hozircha shunchaki <code>2</code> deb yozing. Kampaniyani yaratib bo'lgach, <b>🧮 Avto-interval hisoblash</b> tugmasidan foydalanib 1 bosishda mukammal moslay olasiz!</i>\n\n"
         "⚠️ Ko'p akkaunt bo'lsa, katta son qo'ying (spam oldini olish uchun)"
     )
     await state.set_state(CampaignStates.waiting_acc_interval)
@@ -946,16 +947,33 @@ async def camp_grp_done(cq: CallbackQuery, state: FSMContext):
     db.set_campaign_groups(camp_id, selected_grps)
 
     font_label = FONT_LABELS.get(font_style, "📝 Oddiy")
+    n_acc = len(data["selected_accounts"])
+    auto_acc_int = max(1, round(60.0 / n_acc)) if n_acc > 0 else 2
+
     await cq.message.edit_text(
         f"✅ <b>{data['name']}</b> kampaniyasi yaratildi!\n\n"
         f"⏱ Interval: har {data['interval']} daqiqa\n"
         f"⏳ Akkaunt interval: {acc_interval} soniya\n"
         f"🔤 Shrift: {font_label}\n"
-        f"📱 Akkauntlar: {len(data['selected_accounts'])} ta\n"
+        f"📱 Akkauntlar: {n_acc} ta\n"
         f"👥 Guruhlar: {len(selected_grps)} ta\n\n"
         f"Bot darhol ishga tushadi."
     )
-    await cq.message.answer("🎉 Kampaniya muvaffaqiyatli saqlandi!", reply_markup=main_kb())
+
+    if n_acc >= 1:
+        auto_msg = (
+            f"💡 <b>Tavsiya: Guruh cheklovi (Slow mode 60s) uchun Ideal Interval!</b>\n\n"
+            f"Sizda <b>{n_acc} ta akkaunt</b> ulandi. Agar guruhlarda 1 minutlik cheklov bo'lsa, "
+            f"har bir akkaunt orasiga <b>{auto_acc_int} soniya</b> va umumiy aylanmaga <b>1 daqiqa</b> qo'ysangiz, "
+            f"100% bloklarsiz va taymer kutmasdan mukammal ishlaydi!"
+        )
+        await cq.message.answer(auto_msg, reply_markup=ik(
+            ("🧮 Ideal intervalni o'rnatish (60s / N)", f"camp_auto_apply_{camp_id}_1_{auto_acc_int}"),
+            ("⚙️ Kampaniyani boshqarish", f"camp_detail_{camp_id}")
+        ))
+    else:
+        await cq.message.answer("🎉 Kampaniya muvaffaqiyatli saqlandi!", reply_markup=main_kb())
+
     await state.clear()
     await cq.answer()
 
@@ -1013,6 +1031,7 @@ async def camp_detail(cq: CallbackQuery):
         ("✏️ Matnni o'zgartir", f"camp_edit_text_{cid}"),
         ("⏱ Intervalni o'zgartir", f"camp_edit_int_{cid}"),
         ("⏳ Akkaunt intervalni o'zgartir", f"camp_edit_acc_int_{cid}"),
+        ("🧮 Avto-interval hisoblash (60s / N)", f"camp_auto_calc_{cid}"),
         ("🔤 Shriftni o'zgartir", f"camp_edit_font_{cid}"),
         ("🗑 O'chirish", f"camp_delete_{cid}"),
         ("◀️ Orqaga", "camp_manage"),
@@ -1034,6 +1053,68 @@ async def camp_toggle(cq: CallbackQuery):
         db.update_campaign_field(cid, "next_run", None)
     status = "▶️ Ishga tushirildi" if new_val else "⏸ To'xtatildi"
     await cq.answer(status, show_alert=True)
+    await camp_detail(cq)
+
+
+@router.callback_query(F.data.startswith("camp_auto_calc_"))
+async def camp_auto_calc_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    cid = int(cq.data.split("_")[-1])
+    c = db.get_campaign(cid)
+    if not c:
+        return await cq.answer()
+    
+    accs = db.get_campaign_accounts(cid)
+    grps = db.get_campaign_groups(cid)
+    n_acc = len(accs)
+    if n_acc == 0:
+        await cq.answer("⚠️ Kampaniyaga akkauntlar ulanmagan! Avval akkaunt ulang.", show_alert=True)
+        return
+    
+    ideal_acc_interval = max(1, round(60.0 / n_acc))
+    ideal_camp_interval = 1
+    
+    text = (
+        f"🧮 <b>Avtomatik Ideal Interval Hisoblash (60s / N)</b>\n\n"
+        f"Kampaniya: <b>{c['name']}</b>\n"
+        f"📱 Ulanib turgan akkauntlar: <b>{n_acc} ta</b>\n"
+        f"👥 Tanlangan guruhlar: <b>{len(grps)} ta</b>\n"
+        f"⏱ Guruhlar cheklovi (Slow mode): <b>60 soniya (1 daqiqa)</b>\n\n"
+        f"🎯 <b>Matematik Ideal Sozlama:</b>\n"
+        f"• Akkauntlar orasidagi kutish: <b>{ideal_acc_interval} soniya</b>\n"
+        f"• Kampaniya aylanma intervali: <b>har {ideal_camp_interval} daqiqada</b>\n\n"
+        f"💡 <i>Mantiq: {n_acc}-akkaunt guruhga xabarni yuborib bo'lgach roppa-rosa ~60 soniya o'tadi "
+        f"va yana 1-akkaunt guruh taymeridan to'liq bo'shab, 0% blok va xatosiz aylanadi!</i>\n\n"
+        f"Shu ideal sozlamani o'rnatishni tasdiqlaysizmi?"
+    )
+    buttons = [
+        ("✅ Ideal sozlamani o'rnatish", f"camp_auto_apply_{cid}_{ideal_camp_interval}_{ideal_acc_interval}"),
+        ("◀️ Orqaga", f"camp_detail_{cid}")
+    ]
+    await cq.message.edit_text(text, reply_markup=ik(*buttons))
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("camp_auto_apply_"))
+async def camp_auto_apply_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer()
+    parts = cq.data.split("_")
+    cid = int(parts[3])
+    camp_int = int(parts[4])
+    acc_int = int(parts[5])
+    
+    c = db.get_campaign(cid)
+    if not c:
+        return await cq.answer()
+    
+    db.update_campaign_field(cid, "interval_min", camp_int)
+    db.update_campaign_field(cid, "acc_interval_s", acc_int)
+    
+    await cq.answer(f"✅ Ideal sozlama (har {camp_int} daq / {acc_int}s) o'rnatildi!", show_alert=True)
+    # CQ datani camp_detail ga moslab chaqiramiz
+    cq.data = f"camp_detail_{cid}"
     await camp_detail(cq)
 
 
