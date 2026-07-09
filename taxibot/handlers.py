@@ -1457,6 +1457,7 @@ async def show_admin_panel(event: Message | CallbackQuery):
         ("⚙️ Limitni o'zgartirish", "admin_edit_limit"),
         ("🔑 Parolni o'zgartirish", "admin_edit_pass"),
         ("📝 /yordam matnini tahrirlash", "admin_edit_help"),
+        ("📁 Loglar hajmi va Tozalash", "admin_log_stats"),
         ("🔒 Panelni yopish", "admin_close")
     )
     
@@ -1775,4 +1776,41 @@ async def grp_unmute_all_handler(cq: CallbackQuery):
             count += 1
     await cq.answer(f"✅ {count} ta guruh uyqudan uyg'otildi va aktiv holatga qaytildi!", show_alert=True)
     await menu_groups(cq.message)
+
+
+# ── Server Log & DB Tozalash (/root) ──────────────────────────────────────────
+
+@router.callback_query(F.data == "admin_log_stats")
+async def admin_log_stats_handler(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    
+    stats = db.get_log_and_db_stats()
+    text = (
+        "<b>📁 Server Log va Baza Statistiyasi</b>\n\n"
+        f"💾 <b>Baza fayli (DB):</b> <code>{stats['db_size_mb']} MB</code>\n"
+        f"📑 <b>Log fayllar hajmi:</b> <code>{stats['total_log_mb']} MB</code>\n"
+        f"<i>({stats['found_logs_str']})</i>\n\n"
+        f"📊 <b>Eski yozuvlar:</b>\n"
+        f"• Yuborilganlar tarixi: <b>{stats['sent_messages_count']} ta yozuv</b>\n"
+        f"• Xato ogohlantirishlari: <b>{stats['error_notifications_count']} ta yozuv</b>\n\n"
+        "<i>Tozalashni bosish orqali barcha log fayllar bo'shatiladi hamda 48 soatdan eski tarix yozuvlari (sent_messages) o'chirilib, baza siqiladi (VACUUM). Sessiyalar va kampaniyalarga umuman ta'sir qilmaydi!</i>"
+    )
+    kb = ik(
+        ("🧹 Barcha Loglarni va Eski Tarixni Tozalash", "admin_log_clean"),
+        ("◀️ Orqaga", "admin_back")
+    )
+    await cq.message.edit_text(text, reply_markup=kb)
+    await cq.answer()
+
+
+@router.callback_query(F.data == "admin_log_clean")
+async def admin_log_clean_handler(cq: CallbackQuery):
+    if not check_admin(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    
+    res = db.clean_server_logs(delete_sent_hours=48)
+    await cq.answer(f"✅ Tozalandi! {res['cleaned_mb']} MB log va {res['deleted_db_rows']} ta eski yozuv o'chirildi.", show_alert=True)
+    await admin_log_stats_handler(cq)
+
 

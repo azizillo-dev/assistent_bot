@@ -501,6 +501,200 @@ def save_sent_message(user_id: int, session_name: str, chat_id: int, message_id:
             )
     except Exception:
         pass
+def get_campaign_groups(campaign_id: int) -> list[sqlite3.Row]:
+    with get_conn() as conn:
+        return conn.execute(
+            """SELECT g.* FROM groups g
+               JOIN campaign_groups cg ON cg.group_id=g.id
+               WHERE cg.campaign_id=?""",
+            (campaign_id,),
+        ).fetchall()
+
+
+def get_due_campaigns() -> list[sqlite3.Row]:
+    """next_run vaqti o'tgan yoki NULL bo'lgan aktiv kampaniyalar."""
+    with get_conn() as conn:
+        return conn.execute(
+            """SELECT * FROM campaigns
+               WHERE is_active=1
+               AND (next_run IS NULL OR next_run <= datetime('now'))
+               ORDER BY next_run""",
+        ).fetchall()
+
+
+def log_send(campaign_id: int, account_id: int, group_id: int, status: str, error: str = ""):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO send_log(campaign_id,account_id,group_id,status,error) VALUES(?,?,?,?,?)",
+            (campaign_id, account_id, group_id, status, error),
+        )
+
+
+def get_statistics(user_id: int) -> dict:
+    with get_conn() as conn:
+        acc_total = conn.execute("SELECT COUNT(*) FROM accounts WHERE user_id=?", (user_id,)).fetchone()[0]
+        acc_active = conn.execute("SELECT COUNT(*) FROM accounts WHERE user_id=? AND status='active'", (user_id,)).fetchone()[0]
+        
+        grp_total = conn.execute("SELECT COUNT(*) FROM groups WHERE user_id=?", (user_id,)).fetchone()[0]
+        
+        camp_total = conn.execute("SELECT COUNT(*) FROM campaigns WHERE user_id=?", (user_id,)).fetchone()[0]
+        camp_active = conn.execute("SELECT COUNT(*) FROM campaigns WHERE user_id=? AND is_active=1", (user_id,)).fetchone()[0]
+        
+        sent_today = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='sent' AND date(sl.sent_at) = date('now')
+        """, (user_id,)).fetchone()[0]
+        
+        failed_today = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='failed' AND date(sl.sent_at) = date('now')
+        """, (user_id,)).fetchone()[0]
+        
+        sent_total = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='sent'
+        """, (user_id,)).fetchone()[0]
+        
+        failed_total = conn.execute("""
+            SELECT COUNT(*) FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            WHERE c.user_id=? AND sl.status='failed'
+        """, (user_id,)).fetchone()[0]
+        
+        errors = conn.execute("""
+            SELECT sl.error, sl.sent_at, g.title, g.identifier
+            FROM send_log sl
+            JOIN campaigns c ON sl.campaign_id = c.id
+            LEFT JOIN groups g ON sl.group_id = g.id
+            WHERE c.user_id=? AND sl.status='failed' AND sl.error != ''
+            ORDER BY sl.id DESC LIMIT 5
+        """, (user_id,)).fetchall()
+        
+        error_list = []
+        for r in errors:
+            error_list.append({
+                "error": r["error"],
+                "sent_at": r["sent_at"],
+                "group": r["title"] or r["identifier"] or "Noma'lum"
+            })
+            
+        return {
+            "acc_total": acc_total,
+            "acc_active": acc_active,
+            "grp_total": grp_total,
+            "camp_total": camp_total,
+            "camp_active": camp_active,
+            "sent_today": sent_today,
+            "failed_today": failed_today,
+            "sent_total": sent_total,
+            "failed_total": failed_total,
+            "recent_errors": error_list
+        }
+
+
+# ── Allowed Users & Settings (Secret Admin Panel) ─────────────────────────────
+
+def is_user_allowed(user_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute("SELECT 1 FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        return row is not None
+
+
+def add_allowed_user(user_id: int) -> bool:
+    try:
+        with get_conn() as conn:
+            conn.execute("INSERT OR IGNORE INTO allowed_users (user_id) VALUES (?)", (user_id,))
+        return True
+    except Exception:
+        return False
+
+
+def remove_allowed_user(user_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM allowed_users WHERE user_id=?", (user_id,))
+        return cur.rowcount > 0
+
+
+def get_all_allowed_users() -> list[int]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT user_id FROM allowed_users ORDER BY added_at ASC").fetchall()
+        return [r["user_id"] for r in rows]
+
+
+def get_setting(key: str, default: str = "") -> str:
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else default
+
+
+def set_setting(key: str, value: str):
+    with get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
+
+
+def update_user_info(user_id: int, name: str, username: str):
+    name = (name or "").strip()
+    username = (username or "").strip()
+    with get_conn() as conn:
+        row = conn.execute("SELECT 1 FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        if row:
+            conn.execute("UPDATE allowed_users SET name=?, username=? WHERE user_id=?", (name, username, user_id))
+        else:
+            conn.execute("INSERT OR IGNORE INTO allowed_users (user_id, name, username) VALUES (?, ?, ?)", (user_id, name, username))
+
+
+def is_user_paused(user_id: int) -> bool:
+    with get_conn() as conn:
+        row = conn.execute("SELECT is_paused FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        return bool(row and row["is_paused"] == 1)
+
+
+def set_user_pause(user_id: int, is_paused: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE allowed_users SET is_paused=? WHERE user_id=?", (is_paused, user_id))
+
+
+def get_all_allowed_users_detailed() -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT user_id, name, username, is_paused, added_at FROM allowed_users ORDER BY added_at ASC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_user_info(user_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT user_id, name, username, is_paused, added_at FROM allowed_users WHERE user_id=?", (user_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_settings(user_id: int) -> dict:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM user_settings WHERE user_id=?", (user_id,)).fetchone()
+        if not row:
+            conn.execute("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,))
+            return {"user_id": user_id, "auto_delete_24h": 1, "night_mode": 0, "speed_mode": "normal", "notify_finish": 1}
+        return dict(row)
+
+
+def update_user_setting(user_id: int, key: str, value: any):
+    if key not in ("auto_delete_24h", "night_mode", "speed_mode", "notify_finish"):
+        return
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,))
+        conn.execute(f"UPDATE user_settings SET {key}=? WHERE user_id=?", (value, user_id))
+
+
+def save_sent_message(user_id: int, session_name: str, chat_id: int, message_id: int):
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT INTO sent_messages (user_id, session_name, chat_id, message_id) VALUES (?, ?, ?, ?)",
+                (user_id, session_name, chat_id, message_id)
+            )
+    except Exception:
+        pass
 
 
 def get_old_sent_messages(hours: int = 24, limit: int = 500) -> list[dict]:
@@ -567,3 +761,83 @@ def deactivate_account(account_id: int) -> bool:
         return True
     except Exception:
         return False
+
+
+def get_log_and_db_stats() -> dict:
+    """Serverdagi log fayllari, DB hajmi va eski yozuvlar statistikasini qaytaradi."""
+    import os
+    stats = {}
+    
+    # 1. DB hajmi va yozuvlar soni
+    db_path = getattr(config, "DB_PATH", "taxibot.db")
+    stats["db_size_mb"] = round(os.path.getsize(db_path) / (1024 * 1024), 2) if os.path.exists(db_path) else 0.0
+    
+    try:
+        with get_conn() as conn:
+            sent_count = conn.execute("SELECT COUNT(*) FROM sent_messages").fetchone()[0]
+            err_count = conn.execute("SELECT COUNT(*) FROM error_notifications").fetchone()[0]
+    except Exception:
+        sent_count, err_count = 0, 0
+        
+    stats["sent_messages_count"] = sent_count
+    stats["error_notifications_count"] = err_count
+
+    # 2. Log fayl hajmi
+    log_files = ["data/bot.log", "bot.log", "taxibot.log", "app.log", "/home/nabiyev/assistant_taxist/assistent_bot/taxibot/data/bot.log"]
+    total_log_bytes = 0
+    found_logs = []
+    seen = set()
+    for lf in log_files:
+        if os.path.exists(lf):
+            abs_p = os.path.abspath(lf)
+            if abs_p in seen:
+                continue
+            seen.add(abs_p)
+            sz = os.path.getsize(lf)
+            total_log_bytes += sz
+            found_logs.append(f"{os.path.basename(lf)} ({round(sz / 1024, 1)} KB)")
+            
+    stats["total_log_mb"] = round(total_log_bytes / (1024 * 1024), 2)
+    stats["found_logs_str"] = ", ".join(found_logs) if found_logs else "Log fayl topilmadi (0 KB)"
+    return stats
+
+
+def clean_server_logs(delete_sent_hours: int = 48) -> dict:
+    """Serverdagi log fayllarni va eskirgan DB yozuvlarini tozalaydi (Sessiyalarga va asosiy bazalarga TEGMASDAN!)."""
+    import os
+    from datetime import datetime
+    cleaned_bytes = 0
+    log_files = ["data/bot.log", "bot.log", "taxibot.log", "app.log", "/home/nabiyev/assistant_taxist/assistent_bot/taxibot/data/bot.log"]
+    seen = set()
+    for lf in log_files:
+        if os.path.exists(lf):
+            abs_p = os.path.abspath(lf)
+            if abs_p in seen:
+                continue
+            seen.add(abs_p)
+            try:
+                sz = os.path.getsize(lf)
+                with open(lf, "w", encoding="utf-8") as f:
+                    f.write(f"# Log tozalandi - {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
+                cleaned_bytes += sz
+            except Exception:
+                pass
+
+    del_rows = 0
+    try:
+        with get_conn() as conn:
+            cur1 = conn.execute(f"DELETE FROM sent_messages WHERE sent_at <= datetime('now', '-{delete_sent_hours} hours')")
+            del_rows += cur1.rowcount if cur1.rowcount > 0 else 0
+            cur2 = conn.execute("DELETE FROM error_notifications WHERE notified_at <= datetime('now', '-48 hours')")
+            del_rows += cur2.rowcount if cur2.rowcount > 0 else 0
+            try:
+                conn.execute("VACUUM")
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return {
+        "cleaned_mb": round(cleaned_bytes / (1024 * 1024), 2),
+        "deleted_db_rows": del_rows
+    }
