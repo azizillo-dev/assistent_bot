@@ -394,16 +394,29 @@ async def menu_groups(msg: Message):
         return
     groups = db.get_groups(msg.from_user.id)
     text = f"<b>👥 Guruhlar</b> ({len(groups)} ta)\n\n"
+    import time as time_mod
+    now_ts = time_mod.time()
+    muted_count = 0
     if groups:
         for g in groups:
-            text += f"• {g['title'] or g['identifier']}\n  <code>{g['identifier']}</code>\n"
+            mute_setting = db.get_setting(f"mute_group_{g['id']}")
+            if mute_setting and float(mute_setting) > now_ts:
+                rem_h = int((float(mute_setting) - now_ts) / 3600) + 1
+                status = f"💤 <b>24 soatga uxlatilgan</b> (~{rem_h} soat qoldi)"
+                muted_count += 1
+            else:
+                status = "🟢 Aktiv"
+            text += f"• {g['title'] or g['identifier']} [{status}]\n  <code>{g['identifier']}</code>\n"
     else:
         text += "Hali guruh qo'shilmagan.\n"
 
     buttons = [("➕ Guruh qo'shish", "grp_add"), ("🔍 Akkaunt guruhlarini import qilish", "grp_import_start")]
+    if muted_count > 0:
+        buttons.append(("🔔 Uxlatilgan guruhlarni uyg'otish", "grp_unmute_all"))
     if groups:
         buttons.append(("🗑 Guruh o'chirish", "grp_del_list"))
     await msg.answer(text, reply_markup=ik(*buttons))
+
 
 
 @router.callback_query(F.data == "grp_add")
@@ -1006,6 +1019,11 @@ async def camp_detail(cq: CallbackQuery):
     status = "✅ Aktiv" if c["is_active"] else "⏸ To'xtatilgan"
     font_label = FONT_LABELS.get(c["font_style"] or "none", "📝 Oddiy")
 
+    import time as time_mod
+    now_ts = time_mod.time()
+    muted_grps = sum(1 for g in grps if db.get_setting(f"mute_group_{g['id']}") and float(db.get_setting(f"mute_group_{g['id']}")) > now_ts)
+    grps_str = f"{len(grps)} ta" + (f" (💤 {muted_grps} tasi uxlatilgan)" if muted_grps > 0 else "")
+
     last_run_str = (c['last_run'] or "hali yo'q")[:16]
     next_run_str = (c['next_run'] or "hali yo'q")[:16]
     acc_interval = c["acc_interval_s"] if c["acc_interval_s"] else 2
@@ -1017,7 +1035,7 @@ async def camp_detail(cq: CallbackQuery):
         f"Akkaunt interval: {acc_interval} soniya\n"
         f"Shrift: {font_label}\n"
         f"Akkauntlar: {len(accs)} ta\n"
-        f"Guruhlar: {len(grps)} ta\n"
+        f"Guruhlar: {grps_str}\n"
         f"Oxirgi: {last_run_str}\n"
         f"Keyingi: {next_run_str}\n\n"
         f"<b>Matn:</b>\n{preview_text(c['message_text'], 200)}"
@@ -1743,3 +1761,18 @@ async def err_del_acc_handler(cq: CallbackQuery):
     db.remove_account(acc_id, cq.from_user.id)
     await cq.message.edit_text("✅ <b>Sessiyasi o'chgan akkaunt ro'yxatdan o'chirildi!</b>\n\nEndi bot faqat faol akkauntlar bilan ishlaydi. Istasangiz, ➕ Akkaunt ulash orqali yangilashingiz mumkin.")
     await cq.answer()
+
+
+@router.callback_query(F.data == "grp_unmute_all")
+async def grp_unmute_all_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    groups = db.get_groups(cq.from_user.id)
+    count = 0
+    for g in groups:
+        if db.get_setting(f"mute_group_{g['id']}"):
+            db.set_setting(f"mute_group_{g['id']}", "")
+            count += 1
+    await cq.answer(f"✅ {count} ta guruh uyqudan uyg'otildi va aktiv holatga qaytildi!", show_alert=True)
+    await menu_groups(cq.message)
+
