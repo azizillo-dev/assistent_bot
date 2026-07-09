@@ -113,6 +113,16 @@ def init_db():
             speed_mode      TEXT    DEFAULT 'normal',
             notify_finish   INTEGER DEFAULT 1
         );
+
+        CREATE TABLE IF NOT EXISTS error_notifications (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL,
+            error_type  TEXT NOT NULL,
+            target_id   INTEGER NOT NULL,
+            notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, error_type, target_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_err_notif_time ON error_notifications(notified_at);
         """)
 
     # Eski DB uchun yangi ustunlarni qo'shish (migration)
@@ -509,3 +519,51 @@ def delete_sent_messages_records(ids: list[int]):
         placeholders = ",".join("?" * len(ids))
         conn.execute(f"DELETE FROM sent_messages WHERE id IN ({placeholders})", ids)
 
+
+def should_send_notification(user_id: int, error_type: str, target_id: int, cooldown_hours: int = 12) -> bool:
+    """Tekshiradi: ushbu muammo (guruh/akkaunt) bo'yicha userga oxirgi cooldown_hours soat ichida xabar ketganmi?"""
+    try:
+        with get_conn() as conn:
+            row = conn.execute(
+                f"SELECT id FROM error_notifications WHERE user_id=? AND error_type=? AND target_id=? AND notified_at > datetime('now', '-{cooldown_hours} hours')",
+                (user_id, error_type, target_id)
+            ).fetchone()
+            return row is None
+    except Exception:
+        return True
+
+
+def record_notification(user_id: int, error_type: str, target_id: int):
+    """Userga ogohlantirish xabari ketganini xotiraga yozib qo'yadi."""
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                """INSERT INTO error_notifications (user_id, error_type, target_id, notified_at) 
+                   VALUES (?, ?, ?, datetime('now'))
+                   ON CONFLICT(user_id, error_type, target_id) 
+                   DO UPDATE SET notified_at=datetime('now')""",
+                (user_id, error_type, target_id)
+            )
+    except Exception:
+        pass
+
+
+def remove_group_complete(group_id: int) -> bool:
+    """Muammoli guruhni barcha kampaniyalardan va groups jadvalidan toza o'chirib tashlaydi."""
+    try:
+        with get_conn() as conn:
+            conn.execute("DELETE FROM campaign_groups WHERE group_id=?", (group_id,))
+            conn.execute("DELETE FROM groups WHERE id=?", (group_id,))
+        return True
+    except Exception:
+        return False
+
+
+def deactivate_account(account_id: int) -> bool:
+    """Sessiyasi o'chgan/xato akkauntni inactive holatga o'tkazadi."""
+    try:
+        with get_conn() as conn:
+            conn.execute("UPDATE accounts SET status='inactive' WHERE id=?", (account_id,))
+        return True
+    except Exception:
+        return False

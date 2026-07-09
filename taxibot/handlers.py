@@ -1707,3 +1707,39 @@ async def admin_save_help(msg: Message, state: FSMContext):
         await msg.answer("✅ /yordam qo'llanma matni yangilandi!", reply_markup=ReplyKeyboardRemove())
     await state.clear()
     await show_admin_panel(msg)
+
+
+# --- Aqlli Ogohlantirishlar Callback Handlerlari ---
+
+@router.callback_query(F.data.startswith("err_del_grp_"))
+async def err_del_grp_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    grp_id = int(cq.data.split("_")[-1])
+    if db.remove_group_complete(grp_id):
+        await cq.message.edit_text("✅ <b>Guruh barcha kampaniyalardan va ro'yxatingizdan to'liq o'chirildi!</b>\n\nXatolar to'xtatildi. Statistikangiz toza bo'ladi.")
+    else:
+        await cq.message.edit_text("ℹ️ Guruh allaqachon o'chirilgan yoki topilmadi.")
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("err_mute_grp_"))
+async def err_mute_grp_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    grp_id = int(cq.data.split("_")[-1])
+    import time
+    mute_until = time.time() + 86400
+    db.set_setting(f"mute_group_{grp_id}", str(mute_until))
+    await cq.message.edit_text("💤 <b>Guruh 24 soatga uyqu rejimiga o'tkazildi!</b>\n\nBot bu guruhga 24 soat davomida boshqa xabar yubormaydi va xato ham yozmaydi.")
+    await cq.answer()
+
+
+@router.callback_query(F.data.startswith("err_del_acc_"))
+async def err_del_acc_handler(cq: CallbackQuery):
+    if not allowed(cq.from_user.id):
+        return await cq.answer("⛔ Ruxsat yo'q", show_alert=True)
+    acc_id = int(cq.data.split("_")[-1])
+    db.remove_account(acc_id, cq.from_user.id)
+    await cq.message.edit_text("✅ <b>Sessiyasi o'chgan akkaunt ro'yxatdan o'chirildi!</b>\n\nEndi bot faqat faol akkauntlar bilan ishlaydi. Istasangiz, ➕ Akkaunt ulash orqali yangilashingiz mumkin.")
+    await cq.answer()
