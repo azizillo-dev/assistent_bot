@@ -135,48 +135,13 @@ class CampaignScheduler:
                     db.log_send(campaign_id, acc["id"], group_id, "failed", err_str)
                     sent_fail += 1
 
-                    # 1. Akkaunt sessiyasi o'chgan bo'lsa -> avtomatik inactive qilish va ogohlantirish
+                    # 1. Akkaunt sessiyasi o'chgan bo'lsa -> faqat avtomatik inactive qilish (habar yuborilmaydi)
                     if any(k in err_str for k in ["AuthKeyUnregistered", "AuthKeyInvalid", "SessionRevoked", "avtorizatsiyadan o'tmagan"]):
                         db.deactivate_account(acc["id"])
                         logger.warning("Akkaunt %s (%s) avtorizatsiyadan o'tmagan, to'xtatildi", acc["id"], session_name)
-                        if db.should_send_notification(camp["user_id"], "account_error", acc["id"], cooldown_hours=24):
-                            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                            err_text = (
-                                f"🔴 <b>Sessiyasi o'chgan akkaunt aniqlandi!</b>\n\n"
-                                f"📱 Akkaunt raqami: <b>{acc.get('phone', session_name)}</b>\n"
-                                f"❌ Xato: <b>Telegram ushbu akkauntning sessiyasini o'chirib yuborgan (avtorizatsiya kuygan).</b>\n\n"
-                                f"💡 <i>Ushbu akkaunt boshqa xatolar keltirib chiqarmasligi uchun avtomatik to'xtatildi. Uni ro'yxatdan o'chirib, qaytadan ulashingiz mumkin:</i>"
-                            )
-                            kb = InlineKeyboardMarkup(inline_keyboard=[
-                                [InlineKeyboardButton(text="🗑 Bu akkauntni ro'yxatdan o'chirish", callback_data=f"err_del_acc_{acc['id']}")]
-                            ])
-                            try:
-                                await self.bot.send_message(camp["user_id"], err_text, reply_markup=kb)
-                                db.record_notification(camp["user_id"], "account_error", acc["id"])
-                            except Exception:
-                                pass
                         continue
 
-                    # 2. Guruh yopiq yoki Banned bo'lsa -> aqlli ogohlantirish (action button bilan)
-                    if any(k in err_str for k in ["Yozish taqiqlangan", "ChatWriteForbidden", "Kanalda ban", "UserBannedInChannel"]):
-                        if db.should_send_notification(camp["user_id"], "group_error", group_id, cooldown_hours=12):
-                            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-                            err_text = (
-                                f"⚠️ <b>Kampaniyada muammoli guruh aniqlandi!</b>\n\n"
-                                f"📢 Kampaniya: <b>{camp['name']}</b>\n"
-                                f"👥 Guruh: <b>{identifier}</b>\n"
-                                f"❌ Xato sababi: <b>{err_str}</b> *(Masalan, guruh yozishni yopgan yoki sizni ban qilgan)*\n\n"
-                                f"💡 <i>Har daqiqada xato beravermasligi va statistikangiz (❌ failed) ko'paymasligi uchun bu guruhni ro'yxatdan o'chirishingiz yoki 24 soatga uyqu rejimiga qo'yishingizni so'raymiz:</i>"
-                            )
-                            kb = InlineKeyboardMarkup(inline_keyboard=[
-                                [InlineKeyboardButton(text="🗑 Guruhni ro'yxatdan o'chirish (Tozalash)", callback_data=f"err_del_grp_{group_id}")],
-                                [InlineKeyboardButton(text="💤 24 soatga uyqu rejimiga qo'yish", callback_data=f"err_mute_grp_{group_id}")]
-                            ])
-                            try:
-                                await self.bot.send_message(camp["user_id"], err_text, reply_markup=kb)
-                                db.record_notification(camp["user_id"], "group_error", group_id)
-                            except Exception:
-                                pass
+                    # 2. Guruh yopiq yoki Banned bo'lsa -> faqat logga yozildi (habar berish/ogohlantirish o'chirildi)
 
         logger.info(
             "Kampaniya '%s' [%s] — yuborildi: %d, xato: %d, timer: %d",

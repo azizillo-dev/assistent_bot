@@ -449,16 +449,37 @@ async def grp_add_identifier(msg: Message, state: FSMContext):
     accs = db.get_accounts(msg.from_user.id)
     title = identifier
     if accs:
-        try:
-            client = await session_manager.get_client(accs[0]["session_name"])
-            if await client.is_user_authorized():
-                entity = await client.get_entity(identifier)
-                title = getattr(entity, "title", None) or getattr(entity, "username", identifier)
-        except Exception as e:
-            logger.warning("Guruh tekshirishda xato: %s", e)
+        resolved = False
+        last_err = ""
+        for acc in accs:
+            try:
+                client = await session_manager.get_client(acc["session_name"])
+                if await client.is_user_authorized():
+                    entity = await client.get_entity(identifier)
+                    title = getattr(entity, "title", None) or getattr(entity, "username", identifier)
+                    resolved = True
+                    break
+                else:
+                    db.deactivate_account(acc["id"])
+            except Exception as e:
+                err_str = str(e)
+                if "AuthKeyUnregistered" in err_str or "key is not registered" in err_str:
+                    db.deactivate_account(acc["id"])
+                last_err = err_str
+                continue
+
+        if not resolved and last_err:
+            logger.warning("Guruh tekshirishda xato: %s", last_err)
+            if "AuthKeyUnregistered" in last_err or "key is not registered" in last_err:
+                uz_err = "Sessiyasi o'chgan akkaunt orqali tekshirilganda xato berdi"
+            elif "ResolveUsernameRequest" in last_err or "No user has" in last_err or "Cannot find" in last_err:
+                uz_err = "Bunday username yoki ID topilmadi (yoki guruh maxfiy/yopiq va ulangan akkauntlaringiz bu guruhga a'zo emas)"
+            else:
+                uz_err = f"Telegram xatosi: {last_err[:100]}"
+
             await msg.answer(
-                f"⚠️ Guruhni tekshirib bo'lmadi: {e}\n"
-                "Baribir qo'shishni xohlaysizmi?",
+                f"⚠️ <b>Guruhni avtomatik tekshirib bo'lmadı:</b>\n<i>{uz_err}</i>\n\n"
+                "Baribir ro'yxatga qo'shib qo'yaveraymi?",
                 reply_markup=ik(
                     ("✅ Ha, qo'sh", f"grp_force_{identifier}"),
                     ("❌ Yo'q", "grp_cancel"),
